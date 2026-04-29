@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
    import { verifyGithubSignature } from '@/lib/github-webhook';
    import { supabaseAdmin } from '@/lib/supabase';
+   import { routeEvent } from '@/server/handlers';
    
    export const runtime = 'nodejs';
    export const dynamic = 'force-dynamic';
@@ -28,18 +29,14 @@ import { NextRequest, NextResponse } from 'next/server';
        payload = { _parseError: true };
      }
    
-     // Always log the event, even if signature is bad — helps with debugging.
-     const { error } = await supabaseAdmin.from('webhook_events').insert({
+     // Always log the event
+     await supabaseAdmin.from('webhook_events').insert({
        github_delivery_id: deliveryId,
        event_type: eventType,
        action: payload?.action ?? null,
        payload,
        signature_valid: valid,
      });
-   
-     if (error) {
-       console.error('[webhook] failed to log event:', error);
-     }
    
      if (!valid) {
        return NextResponse.json(
@@ -48,11 +45,25 @@ import { NextRequest, NextResponse } from 'next/server';
        );
      }
    
-     // For now, we just ack. Day 3+ we'll route events to handlers.
-     return NextResponse.json({ ok: true });
+     // Route to handler. Always return 200 to GitHub even if handler throws —
+     // we don't want GitHub to retry endlessly on bugs in our code.
+     let result = 'unrouted';
+     try {
+       result = await routeEvent(eventType, payload);
+     } catch (err: any) {
+       console.error('[handler error]', eventType, err.message);
+       result = `error:${err.message}`;
+     }
+   
+     // Mark the event as processed
+     await supabaseAdmin
+       .from('webhook_events')
+       .update({ processed: true })
+       .eq('github_delivery_id', deliveryId);
+   
+     return NextResponse.json({ ok: true, result });
    }
    
-   // Health check
    export async function GET() {
      return NextResponse.json({ status: 'ready' });
    }
