@@ -42,7 +42,7 @@ import { getInstallationOctokit } from '@/lib/github-app';
        files.push(...(data as ChangedFile[]));
    
        if (data.length < perPage) break;
-       if (page > 30) break; // hard cap at 3000 files for safety
+       if (page > 30) break; // hard cap at 3000 files for safety.
        page += 1;
      }
    
