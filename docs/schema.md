@@ -55,7 +55,7 @@
    - `status` (text) — `queued`, `running`, `completed`, `failed`
    - `summary` (text) — the plain-English behavioral summary
    - `risk_level` (text) — `low`, `medium`, `high`
-   - `risk_flags` (jsonb) — array of detected risks
+   - `risk_flags` (jsonb) — metadata bag for the analysis. Keys include the structural-diff metadata (`file_count`, `supported_file_count`, `additions`, `deletions`, `symbol_changes`, `structural_diff`, `sample_files`) and `detected_risks` (string array of short kebab-case risk labels produced by the LLM).
    - `focus_areas` (jsonb) — files/lines the reviewer should focus on
    - `tokens_used` (integer)
    - `cost_usd_cents` (integer) — track spend per analysis
