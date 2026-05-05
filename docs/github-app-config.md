@@ -7,8 +7,18 @@
    
    ## URLs
    - **Webhook URL:** https://[name].vercel.app/api/webhooks/github
-   - **Callback URL (OAuth):** https://[name].vercel.app/api/auth/github/callback
-   - **Setup URL (post-install):** https://[name].vercel.app/setup
+   - **Callback URL (OAuth):** `https://{project-ref}.supabase.co/auth/v1/callback` —
+     Supabase Auth handles the GitHub OAuth round-trip on our behalf, so the
+     GitHub App's OAuth callback must point at the Supabase project, not at
+     our Next.js app. Whitelist this URL on the GitHub App settings page
+     (GitHub Apps allow multiple callbacks; keep any existing entries).
+     The Supabase callback URL appears in the Supabase dashboard under
+     Authentication → Providers → GitHub once the provider is enabled.
+     Full setup steps: see `docs/auth-setup.md`.
+   - **Setup URL (post-install):** `https://senix.vercel.app/setup` — and
+     **tick "Redirect on update"** so updates to an existing install also
+     bounce the user through `/setup`. This is the page where we link the
+     installation to the signed-in Supabase user.
    
    ## Permissions (Repository)
    - Contents: Read (to fetch PR diffs)

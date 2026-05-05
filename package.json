@@ -17,6 +17,7 @@
     "@octokit/rest": "^22.0.1",
     "@octokit/types": "^16.0.0",
     "@octokit/webhooks": "^14.2.0",
+    "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.1",
     "@upstash/redis": "^1.37.0",
     "groq-sdk": "^1.1.2",
