@@ -98,7 +98,7 @@ export default async function DashboardPage(): Promise<React.ReactElement> {
           <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-6 text-zinc-400 text-sm">
             No repos connected yet.{' '}
             <Link
-              href="https://github.com/apps/senix"
+              href="https://github.com/apps/senix-bot"
               className="text-blue-400 hover:underline"
             >
               Install the GitHub App →
