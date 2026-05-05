@@ -26,6 +26,8 @@ type AnalysisRow = {
   risk_level: string | null;
   focus_areas: FocusArea[] | null;
   risk_flags: RiskFlags | null;
+  github_comment_id: number | null;
+  github_comment_url: string | null;
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -50,7 +52,7 @@ export default async function TestPanelPage(): Promise<React.ReactElement> {
   const { data: rows } = await supabaseAdmin
     .from('analyses')
     .select(
-      'id, status, commit_sha, risk_flags, created_at, error_message, summary, risk_level, focus_areas'
+      'id, status, commit_sha, risk_flags, created_at, error_message, summary, risk_level, focus_areas, github_comment_id, github_comment_url'
     )
     .order('created_at', { ascending: false })
     .limit(10);
@@ -97,6 +99,19 @@ export default async function TestPanelPage(): Promise<React.ReactElement> {
                     )}
                   </div>
                 )}
+
+                {a.github_comment_url ? (
+                  <a
+                    href={a.github_comment_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 text-xs hover:underline"
+                  >
+                    → View on GitHub
+                  </a>
+                ) : a.github_comment_id ? (
+                  <span className="text-zinc-500 text-xs">Comment ID: {a.github_comment_id}</span>
+                ) : null}
 
                 {detectedRisks.length > 0 && (
                   <div className="flex flex-wrap gap-1">

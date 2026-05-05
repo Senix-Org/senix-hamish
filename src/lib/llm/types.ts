@@ -3,7 +3,7 @@ import type { PrMeta } from '@/lib/prompts/pr-analysis';
 
 export type RiskLevel = 'low' | 'medium' | 'high';
 
-export type ProviderName = 'anthropic' | 'gemini';
+export type ProviderName = 'anthropic' | 'gemini' | 'groq' | 'deepseek';
 
 export type FocusArea = {
   file: string;

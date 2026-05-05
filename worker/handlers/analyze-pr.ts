@@ -4,21 +4,24 @@ import { diffFile, FileStructuralDiff } from '../../src/lib/structural-diff';
 import { detectLanguage } from '../../src/lib/parser';
 import { analyzePR, AnalysisResult } from '../../src/lib/llm';
 import { isOverDailyCostCap } from '../../src/lib/cost-tracker';
+import { formatPRComment } from '../../src/lib/format-comment';
+import { upsertPRComment } from '../../src/server/github-comments';
 import type { JobPayloadMap } from '../../src/lib/queue';
 
 const MAX_FILES_FOR_STRUCTURAL_DIFF = 50;
+const DEFAULT_DASHBOARD_URL = 'https://senix.vercel.app';
 
-type PrRow = {
-  title: string | null;
-  author_login: string | null;
-};
+type PrRow = { title: string | null; author_login: string | null };
+type PriorCommentRow = { github_comment_id: number | null };
+type CommentOutcome = { commentId: number | null; commentUrl: string | null; postError: string | null };
+type CommentContext = { pullRequestId: string; installationId: number; owner: string; repo: string; prNumber: number };
 
 /**
  * Process an `analyze-pr` job: fetch the PR diff, build a per-file
  * structural diff, ask the active LLM provider for a behavioral summary,
- * and persist the combined result. The structural diff alone is considered
- * useful, so an LLM failure does not fail the whole analysis — we save the
- * structural data and record the LLM error in `error_message`.
+ * post (or update) the customer-facing PR comment, and persist the result.
+ * LLM and comment failures are recorded in `error_message` but never
+ * escalate to a hard analysis failure — the structural diff is still useful.
  */
 export async function processAnalyzePr(
   payload: JobPayloadMap['analyze-pr']
@@ -34,32 +37,28 @@ export async function processAnalyzePr(
       .select('title, author_login')
       .eq('id', pullRequestId)
       .single();
-
     const pr = (prRow ?? null) as unknown as PrRow | null;
 
     const files = await fetchPRFiles(installationId, owner, repo, prNumber);
     const supportedFiles = files.filter((f) => detectLanguage(f.filename) !== null);
 
     const structural: FileStructuralDiff[] = [];
-
     if (supportedFiles.length <= MAX_FILES_FOR_STRUCTURAL_DIFF) {
       for (const file of supportedFiles) {
-        const isAdded = file.status === 'added';
-        const isRemoved = file.status === 'removed';
-
-        const beforeContent = isAdded
-          ? null
-          : await fetchFileContent(
-              installationId,
-              owner,
-              repo,
-              file.previous_filename ?? file.filename,
-              baseSha
-            );
-        const afterContent = isRemoved
-          ? null
-          : await fetchFileContent(installationId, owner, repo, file.filename, headSha);
-
+        const beforeContent =
+          file.status === 'added'
+            ? null
+            : await fetchFileContent(
+                installationId,
+                owner,
+                repo,
+                file.previous_filename ?? file.filename,
+                baseSha
+              );
+        const afterContent =
+          file.status === 'removed'
+            ? null
+            : await fetchFileContent(installationId, owner, repo, file.filename, headSha);
         structural.push(diffFile(file.filename, beforeContent, afterContent));
       }
     }
@@ -98,16 +97,12 @@ export async function processAnalyzePr(
       }
     }
 
-    const baseRiskFlags = {
-      file_count: files.length,
-      supported_file_count: supportedFiles.length,
-      additions: totalAdditions,
-      deletions: totalDeletions,
-      symbol_changes: symbolChangeCount,
-      structural_diff: structural,
-      sample_files: files.slice(0, 5).map((f) => f.filename),
-      detected_risks: llmResult?.riskFlags ?? [],
-    };
+    const comment: CommentOutcome = llmResult
+      ? await postPRComment({ pullRequestId, installationId, owner, repo, prNumber }, llmResult)
+      : { commentId: null, commentUrl: null, postError: null };
+
+    const errorMessage =
+      [llmError, comment.postError].filter((p): p is string => Boolean(p)).join(' | ') || null;
 
     await supabaseAdmin
       .from('analyses')
@@ -119,8 +114,19 @@ export async function processAnalyzePr(
         focus_areas: llmResult?.focusAreas ?? [],
         tokens_used: llmResult?.tokensUsed ?? null,
         cost_usd_cents: llmResult?.costUsdCents ?? null,
-        error_message: llmError,
-        risk_flags: baseRiskFlags,
+        error_message: errorMessage,
+        risk_flags: {
+          file_count: files.length,
+          supported_file_count: supportedFiles.length,
+          additions: totalAdditions,
+          deletions: totalDeletions,
+          symbol_changes: symbolChangeCount,
+          structural_diff: structural,
+          sample_files: files.slice(0, 5).map((f) => f.filename),
+          detected_risks: llmResult?.riskFlags ?? [],
+        },
+        github_comment_id: comment.commentId,
+        github_comment_url: comment.commentUrl,
       })
       .eq('id', analysisId);
   } catch (err: any) {
@@ -133,5 +139,55 @@ export async function processAnalyzePr(
       })
       .eq('id', analysisId);
     throw err;
+  }
+}
+
+async function postPRComment(
+  ctx: CommentContext,
+  llmResult: AnalysisResult
+): Promise<CommentOutcome> {
+  if (process.env.POST_PR_COMMENTS !== 'true') {
+    console.log('[worker] skipping PR comment (POST_PR_COMMENTS != true)');
+    return { commentId: null, commentUrl: null, postError: null };
+  }
+
+  const { data: priorRow } = await supabaseAdmin
+    .from('analyses')
+    .select('github_comment_id')
+    .eq('pull_request_id', ctx.pullRequestId)
+    .not('github_comment_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const prior = (priorRow ?? null) as unknown as PriorCommentRow | null;
+  const existingCommentId = prior?.github_comment_id ?? null;
+
+  const dashboardUrl = `${process.env.DASHBOARD_URL || DEFAULT_DASHBOARD_URL}/internal/test`;
+  const body = formatPRComment({
+    summary: llmResult.summary,
+    riskLevel: llmResult.riskLevel,
+    riskFlags: llmResult.riskFlags,
+    focusAreas: llmResult.focusAreas,
+    provider: llmResult.provider,
+    tokensUsed: llmResult.tokensUsed,
+    costUsdCents: llmResult.costUsdCents,
+    dashboardUrl,
+  });
+
+  try {
+    const { commentId, commentUrl } = await upsertPRComment({
+      installationId: ctx.installationId,
+      owner: ctx.owner,
+      repo: ctx.repo,
+      prNumber: ctx.prNumber,
+      commentBody: body,
+      existingCommentId,
+    });
+    console.log(`[worker] posted comment ${commentId} on ${ctx.owner}/${ctx.repo}#${ctx.prNumber}`);
+    return { commentId, commentUrl, postError: null };
+  } catch (err: any) {
+    const message = err?.message ?? String(err);
+    console.error(`[worker] comment post failed: ${message}`);
+    return { commentId: null, commentUrl: null, postError: message };
   }
 }
