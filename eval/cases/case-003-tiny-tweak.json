@@ -1,0 +1,39 @@
+{
+  "id": "case-003-tiny-tweak",
+  "description": "Fixes a typo in a JSDoc comment. No behavior change.",
+  "expectedRiskLevel": "low",
+  "expectedFlags": [],
+  "prMeta": {
+    "title": "docs: fix typo in formatPrice JSDoc",
+    "author": "sam-typo-hunter",
+    "filesChanged": 1,
+    "additions": 1,
+    "deletions": 1
+  },
+  "structuralDiff": [
+    {
+      "filename": "src/lib/format.ts",
+      "language": "typescript",
+      "supported": true,
+      "summary": { "added": 0, "removed": 0, "modified": 1, "unchanged": 6 },
+      "changes": [
+        {
+          "id": "formatPrice",
+          "name": "formatPrice",
+          "kind": "function",
+          "change": "modified",
+          "before": {
+            "startLine": 5,
+            "endLine": 12,
+            "bodyText": "/**\n * Formats a numeric price into a localized currancy string.\n */\nexport function formatPrice(value: number, currency = 'USD'): string {\n  return new Intl.NumberFormat('en-US', {\n    style: 'currency',\n    currency,\n  }).format(value);\n}"
+          },
+          "after": {
+            "startLine": 5,
+            "endLine": 12,
+            "bodyText": "/**\n * Formats a numeric price into a localized currency string.\n */\nexport function formatPrice(value: number, currency = 'USD'): string {\n  return new Intl.NumberFormat('en-US', {\n    style: 'currency',\n    currency,\n  }).format(value);\n}"
+          }
+        }
+      ]
+    }
+  ]
+}

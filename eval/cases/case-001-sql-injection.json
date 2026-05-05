@@ -1,0 +1,35 @@
+{
+  "id": "case-001-sql-injection",
+  "description": "Adds a new lookup function that builds a SQL query by concatenating the user-supplied id directly into the query string.",
+  "expectedRiskLevel": "high",
+  "expectedFlags": ["sql-injection"],
+  "prMeta": {
+    "title": "Add fast user lookup helper",
+    "author": "alex-dev",
+    "filesChanged": 1,
+    "additions": 9,
+    "deletions": 0
+  },
+  "structuralDiff": [
+    {
+      "filename": "src/server/users.ts",
+      "language": "typescript",
+      "supported": true,
+      "summary": { "added": 1, "removed": 0, "modified": 0, "unchanged": 4 },
+      "changes": [
+        {
+          "id": "findUserById",
+          "name": "findUserById",
+          "kind": "function",
+          "change": "added",
+          "before": null,
+          "after": {
+            "startLine": 42,
+            "endLine": 50,
+            "bodyText": "export async function findUserById(id: string) {\n  const sql = `SELECT id, email, role FROM users WHERE id = '${id}' LIMIT 1`;\n  const result = await db.query(sql);\n  if (result.rows.length === 0) return null;\n  return result.rows[0];\n}"
+          }
+        }
+      ]
+    }
+  ]
+}

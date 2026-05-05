@@ -1,0 +1,39 @@
+{
+  "id": "case-002-auth-removal",
+  "description": "Removes the requireAuth check from the admin export route, making it publicly accessible.",
+  "expectedRiskLevel": "high",
+  "expectedFlags": ["auth-change", "removed-validation"],
+  "prMeta": {
+    "title": "Quick fix: unblock CSV export for QA",
+    "author": "jordan-rivera",
+    "filesChanged": 1,
+    "additions": 4,
+    "deletions": 9
+  },
+  "structuralDiff": [
+    {
+      "filename": "src/app/api/admin/export/route.ts",
+      "language": "typescript",
+      "supported": true,
+      "summary": { "added": 0, "removed": 0, "modified": 1, "unchanged": 0 },
+      "changes": [
+        {
+          "id": "GET",
+          "name": "GET",
+          "kind": "function",
+          "change": "modified",
+          "before": {
+            "startLine": 12,
+            "endLine": 28,
+            "bodyText": "export async function GET(req: NextRequest) {\n  const session = await requireAuth(req);\n  if (!session || session.role !== 'admin') {\n    return new NextResponse('Forbidden', { status: 403 });\n  }\n  const rows = await loadAllUsers();\n  const csv = toCsv(rows);\n  return new NextResponse(csv, {\n    headers: { 'Content-Type': 'text/csv' },\n  });\n}"
+          },
+          "after": {
+            "startLine": 12,
+            "endLine": 19,
+            "bodyText": "export async function GET(req: NextRequest) {\n  const rows = await loadAllUsers();\n  const csv = toCsv(rows);\n  return new NextResponse(csv, {\n    headers: { 'Content-Type': 'text/csv' },\n  });\n}"
+          }
+        }
+      ]
+    }
+  ]
+}

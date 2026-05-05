@@ -1,0 +1,51 @@
+{
+  "id": "case-008-input-validation-added",
+  "description": "Adds zod validation to a previously unchecked POST handler for /api/profile.",
+  "expectedRiskLevel": "low",
+  "expectedFlags": [],
+  "prMeta": {
+    "title": "harden: validate profile update payload",
+    "author": "rhea-secure",
+    "filesChanged": 1,
+    "additions": 11,
+    "deletions": 1
+  },
+  "structuralDiff": [
+    {
+      "filename": "src/app/api/profile/route.ts",
+      "language": "typescript",
+      "supported": true,
+      "summary": { "added": 1, "removed": 0, "modified": 1, "unchanged": 0 },
+      "changes": [
+        {
+          "id": "ProfileSchema",
+          "name": "ProfileSchema",
+          "kind": "const",
+          "change": "added",
+          "before": null,
+          "after": {
+            "startLine": 4,
+            "endLine": 9,
+            "bodyText": "const ProfileSchema = z.object({\n  displayName: z.string().min(1).max(80),\n  bio: z.string().max(280).optional(),\n  avatarUrl: z.string().url().optional(),\n});"
+          }
+        },
+        {
+          "id": "POST",
+          "name": "POST",
+          "kind": "function",
+          "change": "modified",
+          "before": {
+            "startLine": 11,
+            "endLine": 17,
+            "bodyText": "export async function POST(req: NextRequest) {\n  const body = await req.json();\n  const userId = await requireUserId(req);\n  await db.profile.update({ where: { userId }, data: body });\n  return NextResponse.json({ ok: true });\n}"
+          },
+          "after": {
+            "startLine": 11,
+            "endLine": 21,
+            "bodyText": "export async function POST(req: NextRequest) {\n  const json = await req.json();\n  const parsed = ProfileSchema.safeParse(json);\n  if (!parsed.success) {\n    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });\n  }\n  const userId = await requireUserId(req);\n  await db.profile.update({ where: { userId }, data: parsed.data });\n  return NextResponse.json({ ok: true });\n}"
+          }
+        }
+      ]
+    }
+  ]
+}

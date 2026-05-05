@@ -1,0 +1,35 @@
+{
+  "id": "case-005-new-external-api",
+  "description": "Adds a function that calls a third-party enrichment API to fetch company data on signup.",
+  "expectedRiskLevel": "medium",
+  "expectedFlags": ["new-external-api"],
+  "prMeta": {
+    "title": "feat: enrich signups via Clearbit",
+    "author": "diego-growth",
+    "filesChanged": 1,
+    "additions": 14,
+    "deletions": 0
+  },
+  "structuralDiff": [
+    {
+      "filename": "src/server/enrich.ts",
+      "language": "typescript",
+      "supported": true,
+      "summary": { "added": 1, "removed": 0, "modified": 0, "unchanged": 0 },
+      "changes": [
+        {
+          "id": "enrichCompany",
+          "name": "enrichCompany",
+          "kind": "function",
+          "change": "added",
+          "before": null,
+          "after": {
+            "startLine": 1,
+            "endLine": 14,
+            "bodyText": "export async function enrichCompany(domain: string): Promise<EnrichedCompany | null> {\n  const res = await fetch(`https://company.clearbit.com/v2/companies/find?domain=${domain}`, {\n    headers: { Authorization: `Bearer ${process.env.CLEARBIT_API_KEY}` },\n  });\n  if (res.status === 404) return null;\n  if (!res.ok) {\n    throw new Error(`Clearbit lookup failed: ${res.status}`);\n  }\n  const data = await res.json();\n  return {\n    name: data.name,\n    industry: data.category?.industry ?? null,\n    employees: data.metrics?.employees ?? null,\n  };\n}"
+          }
+        }
+      ]
+    }
+  ]
+}

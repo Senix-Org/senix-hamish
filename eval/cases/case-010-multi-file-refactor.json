@@ -1,0 +1,143 @@
+{
+  "id": "case-010-multi-file-refactor",
+  "description": "Mechanical rename of getCurrentUser to getViewer across five files. No logic changes.",
+  "expectedRiskLevel": "low",
+  "expectedFlags": [],
+  "prMeta": {
+    "title": "rename: getCurrentUser -> getViewer",
+    "author": "noor-cleanup",
+    "filesChanged": 5,
+    "additions": 5,
+    "deletions": 5
+  },
+  "structuralDiff": [
+    {
+      "filename": "src/server/viewer.ts",
+      "language": "typescript",
+      "supported": true,
+      "summary": { "added": 1, "removed": 1, "modified": 0, "unchanged": 0 },
+      "changes": [
+        {
+          "id": "getCurrentUser",
+          "name": "getCurrentUser",
+          "kind": "function",
+          "change": "removed",
+          "before": {
+            "startLine": 4,
+            "endLine": 9,
+            "bodyText": "export async function getCurrentUser(req: NextRequest): Promise<User | null> {\n  const session = await readSession(req);\n  if (!session) return null;\n  return loadUser(session.userId);\n}"
+          },
+          "after": null
+        },
+        {
+          "id": "getViewer",
+          "name": "getViewer",
+          "kind": "function",
+          "change": "added",
+          "before": null,
+          "after": {
+            "startLine": 4,
+            "endLine": 9,
+            "bodyText": "export async function getViewer(req: NextRequest): Promise<User | null> {\n  const session = await readSession(req);\n  if (!session) return null;\n  return loadUser(session.userId);\n}"
+          }
+        }
+      ]
+    },
+    {
+      "filename": "src/app/api/me/route.ts",
+      "language": "typescript",
+      "supported": true,
+      "summary": { "added": 0, "removed": 0, "modified": 1, "unchanged": 0 },
+      "changes": [
+        {
+          "id": "GET",
+          "name": "GET",
+          "kind": "function",
+          "change": "modified",
+          "before": {
+            "startLine": 5,
+            "endLine": 9,
+            "bodyText": "export async function GET(req: NextRequest) {\n  const user = await getCurrentUser(req);\n  if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });\n  return NextResponse.json(user);\n}"
+          },
+          "after": {
+            "startLine": 5,
+            "endLine": 9,
+            "bodyText": "export async function GET(req: NextRequest) {\n  const user = await getViewer(req);\n  if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });\n  return NextResponse.json(user);\n}"
+          }
+        }
+      ]
+    },
+    {
+      "filename": "src/app/api/posts/route.ts",
+      "language": "typescript",
+      "supported": true,
+      "summary": { "added": 0, "removed": 0, "modified": 1, "unchanged": 0 },
+      "changes": [
+        {
+          "id": "POST",
+          "name": "POST",
+          "kind": "function",
+          "change": "modified",
+          "before": {
+            "startLine": 8,
+            "endLine": 14,
+            "bodyText": "export async function POST(req: NextRequest) {\n  const user = await getCurrentUser(req);\n  if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });\n  const body = await req.json();\n  const post = await createPost(user.id, body);\n  return NextResponse.json(post, { status: 201 });\n}"
+          },
+          "after": {
+            "startLine": 8,
+            "endLine": 14,
+            "bodyText": "export async function POST(req: NextRequest) {\n  const user = await getViewer(req);\n  if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });\n  const body = await req.json();\n  const post = await createPost(user.id, body);\n  return NextResponse.json(post, { status: 201 });\n}"
+          }
+        }
+      ]
+    },
+    {
+      "filename": "src/server/comments.ts",
+      "language": "typescript",
+      "supported": true,
+      "summary": { "added": 0, "removed": 0, "modified": 1, "unchanged": 1 },
+      "changes": [
+        {
+          "id": "addComment",
+          "name": "addComment",
+          "kind": "function",
+          "change": "modified",
+          "before": {
+            "startLine": 10,
+            "endLine": 16,
+            "bodyText": "export async function addComment(req: NextRequest, postId: string, text: string) {\n  const user = await getCurrentUser(req);\n  if (!user) throw new Error('unauthenticated');\n  return db.comment.create({ data: { postId, authorId: user.id, text } });\n}"
+          },
+          "after": {
+            "startLine": 10,
+            "endLine": 16,
+            "bodyText": "export async function addComment(req: NextRequest, postId: string, text: string) {\n  const user = await getViewer(req);\n  if (!user) throw new Error('unauthenticated');\n  return db.comment.create({ data: { postId, authorId: user.id, text } });\n}"
+          }
+        }
+      ]
+    },
+    {
+      "filename": "src/server/notifications.ts",
+      "language": "typescript",
+      "supported": true,
+      "summary": { "added": 0, "removed": 0, "modified": 1, "unchanged": 2 },
+      "changes": [
+        {
+          "id": "listUnread",
+          "name": "listUnread",
+          "kind": "function",
+          "change": "modified",
+          "before": {
+            "startLine": 12,
+            "endLine": 17,
+            "bodyText": "export async function listUnread(req: NextRequest) {\n  const user = await getCurrentUser(req);\n  if (!user) return [];\n  return db.notification.findMany({ where: { userId: user.id, readAt: null } });\n}"
+          },
+          "after": {
+            "startLine": 12,
+            "endLine": 17,
+            "bodyText": "export async function listUnread(req: NextRequest) {\n  const user = await getViewer(req);\n  if (!user) return [];\n  return db.notification.findMany({ where: { userId: user.id, readAt: null } });\n}"
+          }
+        }
+      ]
+    }
+  ]
+}

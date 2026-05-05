@@ -1,0 +1,51 @@
+{
+  "id": "case-004-refactor",
+  "description": "Extracts the inline cart-total math into a private helper. Behavior is preserved.",
+  "expectedRiskLevel": "low",
+  "expectedFlags": [],
+  "prMeta": {
+    "title": "refactor: extract calcSubtotal helper",
+    "author": "priya-engineer",
+    "filesChanged": 1,
+    "additions": 12,
+    "deletions": 8
+  },
+  "structuralDiff": [
+    {
+      "filename": "src/lib/cart.ts",
+      "language": "typescript",
+      "supported": true,
+      "summary": { "added": 1, "removed": 0, "modified": 1, "unchanged": 3 },
+      "changes": [
+        {
+          "id": "calcSubtotal",
+          "name": "calcSubtotal",
+          "kind": "function",
+          "change": "added",
+          "before": null,
+          "after": {
+            "startLine": 8,
+            "endLine": 14,
+            "bodyText": "function calcSubtotal(items: CartItem[]): number {\n  let total = 0;\n  for (const item of items) {\n    total += item.price * item.quantity;\n  }\n  return total;\n}"
+          }
+        },
+        {
+          "id": "buildCart",
+          "name": "buildCart",
+          "kind": "function",
+          "change": "modified",
+          "before": {
+            "startLine": 16,
+            "endLine": 28,
+            "bodyText": "export function buildCart(items: CartItem[], taxRate: number): Cart {\n  let subtotal = 0;\n  for (const item of items) {\n    subtotal += item.price * item.quantity;\n  }\n  const tax = subtotal * taxRate;\n  return { items, subtotal, tax, total: subtotal + tax };\n}"
+          },
+          "after": {
+            "startLine": 16,
+            "endLine": 22,
+            "bodyText": "export function buildCart(items: CartItem[], taxRate: number): Cart {\n  const subtotal = calcSubtotal(items);\n  const tax = subtotal * taxRate;\n  return { items, subtotal, tax, total: subtotal + tax };\n}"
+          }
+        }
+      ]
+    }
+  ]
+}

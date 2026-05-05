@@ -1,0 +1,890 @@
+{
+  "promptVersion": "v2",
+  "provider": "deepseek",
+  "model": "deepseek",
+  "startedAt": "2026-05-05T18:14:14.987Z",
+  "totalCases": 10,
+  "results": [
+    {
+      "case": {
+        "id": "case-001-sql-injection",
+        "description": "Adds a new lookup function that builds a SQL query by concatenating the user-supplied id directly into the query string.",
+        "expectedRiskLevel": "high",
+        "expectedFlags": [
+          "sql-injection"
+        ],
+        "prMeta": {
+          "title": "Add fast user lookup helper",
+          "author": "alex-dev",
+          "filesChanged": 1,
+          "additions": 9,
+          "deletions": 0
+        },
+        "structuralDiff": [
+          {
+            "filename": "src/server/users.ts",
+            "language": "typescript",
+            "supported": true,
+            "summary": {
+              "added": 1,
+              "removed": 0,
+              "modified": 0,
+              "unchanged": 4
+            },
+            "changes": [
+              {
+                "id": "findUserById",
+                "name": "findUserById",
+                "kind": "function",
+                "change": "added",
+                "before": null,
+                "after": {
+                  "startLine": 42,
+                  "endLine": 50,
+                  "bodyText": "export async function findUserById(id: string) {\n  const sql = `SELECT id, email, role FROM users WHERE id = '${id}' LIMIT 1`;\n  const result = await db.query(sql);\n  if (result.rows.length === 0) return null;\n  return result.rows[0];\n}"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "output": null,
+      "score": null,
+      "durationMs": 60050,
+      "error": "DeepSeek analysis timed out after 60s"
+    },
+    {
+      "case": {
+        "id": "case-002-auth-removal",
+        "description": "Removes the requireAuth check from the admin export route, making it publicly accessible.",
+        "expectedRiskLevel": "high",
+        "expectedFlags": [
+          "auth-change",
+          "removed-validation"
+        ],
+        "prMeta": {
+          "title": "Quick fix: unblock CSV export for QA",
+          "author": "jordan-rivera",
+          "filesChanged": 1,
+          "additions": 4,
+          "deletions": 9
+        },
+        "structuralDiff": [
+          {
+            "filename": "src/app/api/admin/export/route.ts",
+            "language": "typescript",
+            "supported": true,
+            "summary": {
+              "added": 0,
+              "removed": 0,
+              "modified": 1,
+              "unchanged": 0
+            },
+            "changes": [
+              {
+                "id": "GET",
+                "name": "GET",
+                "kind": "function",
+                "change": "modified",
+                "before": {
+                  "startLine": 12,
+                  "endLine": 28,
+                  "bodyText": "export async function GET(req: NextRequest) {\n  const session = await requireAuth(req);\n  if (!session || session.role !== 'admin') {\n    return new NextResponse('Forbidden', { status: 403 });\n  }\n  const rows = await loadAllUsers();\n  const csv = toCsv(rows);\n  return new NextResponse(csv, {\n    headers: { 'Content-Type': 'text/csv' },\n  });\n}"
+                },
+                "after": {
+                  "startLine": 12,
+                  "endLine": 19,
+                  "bodyText": "export async function GET(req: NextRequest) {\n  const rows = await loadAllUsers();\n  const csv = toCsv(rows);\n  return new NextResponse(csv, {\n    headers: { 'Content-Type': 'text/csv' },\n  });\n}"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "output": {
+        "summary": "The admin export endpoint no longer requires authentication or admin role checks. Any user can now download the full list of all users' personal data as a CSV. This exposes sensitive information to the public.",
+        "riskLevel": "high",
+        "riskFlags": [
+          "auth-change",
+          "data-leak"
+        ],
+        "focusAreas": [
+          {
+            "file": "src/app/api/admin/export/route.ts",
+            "lines": "2-5",
+            "reason": "Authentication and authorization check removed, allowing unauthenticated access to sensitive user data export."
+          }
+        ],
+        "tokensUsed": 2225,
+        "costUsdCents": 1,
+        "provider": "deepseek"
+      },
+      "score": {
+        "caseId": "case-002-auth-removal",
+        "accuracy": 3,
+        "specificity": 3,
+        "riskCalibration": 3,
+        "conciseness": 3,
+        "notes": ""
+      },
+      "durationMs": 44913,
+      "error": null
+    },
+    {
+      "case": {
+        "id": "case-003-tiny-tweak",
+        "description": "Fixes a typo in a JSDoc comment. No behavior change.",
+        "expectedRiskLevel": "low",
+        "expectedFlags": [],
+        "prMeta": {
+          "title": "docs: fix typo in formatPrice JSDoc",
+          "author": "sam-typo-hunter",
+          "filesChanged": 1,
+          "additions": 1,
+          "deletions": 1
+        },
+        "structuralDiff": [
+          {
+            "filename": "src/lib/format.ts",
+            "language": "typescript",
+            "supported": true,
+            "summary": {
+              "added": 0,
+              "removed": 0,
+              "modified": 1,
+              "unchanged": 6
+            },
+            "changes": [
+              {
+                "id": "formatPrice",
+                "name": "formatPrice",
+                "kind": "function",
+                "change": "modified",
+                "before": {
+                  "startLine": 5,
+                  "endLine": 12,
+                  "bodyText": "/**\n * Formats a numeric price into a localized currancy string.\n */\nexport function formatPrice(value: number, currency = 'USD'): string {\n  return new Intl.NumberFormat('en-US', {\n    style: 'currency',\n    currency,\n  }).format(value);\n}"
+                },
+                "after": {
+                  "startLine": 5,
+                  "endLine": 12,
+                  "bodyText": "/**\n * Formats a numeric price into a localized currency string.\n */\nexport function formatPrice(value: number, currency = 'USD'): string {\n  return new Intl.NumberFormat('en-US', {\n    style: 'currency',\n    currency,\n  }).format(value);\n}"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "output": {
+        "summary": "This commit corrects a typo in the JSDoc comment of formatPrice. The function's implementation remains unchanged. No behavioral differences exist in this pull request.",
+        "riskLevel": "low",
+        "riskFlags": [],
+        "focusAreas": [],
+        "tokensUsed": 1584,
+        "costUsdCents": 1,
+        "provider": "deepseek"
+      },
+      "score": {
+        "caseId": "case-003-tiny-tweak",
+        "accuracy": 3,
+        "specificity": 3,
+        "riskCalibration": 3,
+        "conciseness": 3,
+        "notes": ""
+      },
+      "durationMs": 20315,
+      "error": null
+    },
+    {
+      "case": {
+        "id": "case-004-refactor",
+        "description": "Extracts the inline cart-total math into a private helper. Behavior is preserved.",
+        "expectedRiskLevel": "low",
+        "expectedFlags": [],
+        "prMeta": {
+          "title": "refactor: extract calcSubtotal helper",
+          "author": "priya-engineer",
+          "filesChanged": 1,
+          "additions": 12,
+          "deletions": 8
+        },
+        "structuralDiff": [
+          {
+            "filename": "src/lib/cart.ts",
+            "language": "typescript",
+            "supported": true,
+            "summary": {
+              "added": 1,
+              "removed": 0,
+              "modified": 1,
+              "unchanged": 3
+            },
+            "changes": [
+              {
+                "id": "calcSubtotal",
+                "name": "calcSubtotal",
+                "kind": "function",
+                "change": "added",
+                "before": null,
+                "after": {
+                  "startLine": 8,
+                  "endLine": 14,
+                  "bodyText": "function calcSubtotal(items: CartItem[]): number {\n  let total = 0;\n  for (const item of items) {\n    total += item.price * item.quantity;\n  }\n  return total;\n}"
+                }
+              },
+              {
+                "id": "buildCart",
+                "name": "buildCart",
+                "kind": "function",
+                "change": "modified",
+                "before": {
+                  "startLine": 16,
+                  "endLine": 28,
+                  "bodyText": "export function buildCart(items: CartItem[], taxRate: number): Cart {\n  let subtotal = 0;\n  for (const item of items) {\n    subtotal += item.price * item.quantity;\n  }\n  const tax = subtotal * taxRate;\n  return { items, subtotal, tax, total: subtotal + tax };\n}"
+                },
+                "after": {
+                  "startLine": 16,
+                  "endLine": 22,
+                  "bodyText": "export function buildCart(items: CartItem[], taxRate: number): Cart {\n  const subtotal = calcSubtotal(items);\n  const tax = subtotal * taxRate;\n  return { items, subtotal, tax, total: subtotal + tax };\n}"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "output": {
+        "summary": "The PR extracts the subtotal calculation into a standalone helper function without modifying its arithmetic. The new function produces the same sum of price * quantity as the previous inlined loop. No behavioral changes are introduced, making the refactor safe.",
+        "riskLevel": "low",
+        "riskFlags": [],
+        "focusAreas": [],
+        "tokensUsed": 1681,
+        "costUsdCents": 1,
+        "provider": "deepseek"
+      },
+      "score": {
+        "caseId": "case-004-refactor",
+        "accuracy": 3,
+        "specificity": 3,
+        "riskCalibration": 3,
+        "conciseness": 3,
+        "notes": ""
+      },
+      "durationMs": 18634,
+      "error": null
+    },
+    {
+      "case": {
+        "id": "case-005-new-external-api",
+        "description": "Adds a function that calls a third-party enrichment API to fetch company data on signup.",
+        "expectedRiskLevel": "medium",
+        "expectedFlags": [
+          "new-external-api"
+        ],
+        "prMeta": {
+          "title": "feat: enrich signups via Clearbit",
+          "author": "diego-growth",
+          "filesChanged": 1,
+          "additions": 14,
+          "deletions": 0
+        },
+        "structuralDiff": [
+          {
+            "filename": "src/server/enrich.ts",
+            "language": "typescript",
+            "supported": true,
+            "summary": {
+              "added": 1,
+              "removed": 0,
+              "modified": 0,
+              "unchanged": 0
+            },
+            "changes": [
+              {
+                "id": "enrichCompany",
+                "name": "enrichCompany",
+                "kind": "function",
+                "change": "added",
+                "before": null,
+                "after": {
+                  "startLine": 1,
+                  "endLine": 14,
+                  "bodyText": "export async function enrichCompany(domain: string): Promise<EnrichedCompany | null> {\n  const res = await fetch(`https://company.clearbit.com/v2/companies/find?domain=${domain}`, {\n    headers: { Authorization: `Bearer ${process.env.CLEARBIT_API_KEY}` },\n  });\n  if (res.status === 404) return null;\n  if (!res.ok) {\n    throw new Error(`Clearbit lookup failed: ${res.status}`);\n  }\n  const data = await res.json();\n  return {\n    name: data.name,\n    industry: data.category?.industry ?? null,\n    employees: data.metrics?.employees ?? null,\n  };\n}"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "output": {
+        "summary": "The codebase now includes a function that fetches company enrichment data from Clearbit's API using a domain name. The function reads the Clearbit API key from an environment variable and handles 404 and other HTTP errors. This change introduces a new outbound HTTP call to a third-party service, enabling enrichment of signup data.",
+        "riskLevel": "medium",
+        "riskFlags": [
+          "new-external-api"
+        ],
+        "focusAreas": [
+          {
+            "file": "src/server/enrich.ts",
+            "lines": "1-14",
+            "reason": "New external API call to Clearbit using environment variable; verify error handling and response mapping."
+          }
+        ],
+        "tokensUsed": 1941,
+        "costUsdCents": 1,
+        "provider": "deepseek"
+      },
+      "score": {
+        "caseId": "case-005-new-external-api",
+        "accuracy": 3,
+        "specificity": 3,
+        "riskCalibration": 3,
+        "conciseness": 2,
+        "notes": ""
+      },
+      "durationMs": 25343,
+      "error": null
+    },
+    {
+      "case": {
+        "id": "case-006-hardcoded-secret",
+        "description": "Adds a hardcoded Stripe secret key directly into the source instead of reading it from env.",
+        "expectedRiskLevel": "high",
+        "expectedFlags": [
+          "hardcoded-secret",
+          "auth-change"
+        ],
+        "prMeta": {
+          "title": "fix: stripe webhook returning 401 in staging",
+          "author": "morgan-fix-it",
+          "filesChanged": 1,
+          "additions": 3,
+          "deletions": 1
+        },
+        "structuralDiff": [
+          {
+            "filename": "src/server/stripe-client.ts",
+            "language": "typescript",
+            "supported": true,
+            "summary": {
+              "added": 1,
+              "removed": 0,
+              "modified": 1,
+              "unchanged": 1
+            },
+            "changes": [
+              {
+                "id": "STRIPE_SECRET",
+                "name": "STRIPE_SECRET",
+                "kind": "const",
+                "change": "added",
+                "before": null,
+                "after": {
+                  "startLine": 3,
+                  "endLine": 3,
+                  "bodyText": "const STRIPE_SECRET = 'sk_live_REDACTED_TEST_FIXTURE_PLACEHOLDER';"
+                }
+              },
+              {
+                "id": "getStripeClient",
+                "name": "getStripeClient",
+                "kind": "function",
+                "change": "modified",
+                "before": {
+                  "startLine": 5,
+                  "endLine": 11,
+                  "bodyText": "export function getStripeClient(): Stripe {\n  const key = process.env.STRIPE_SECRET_KEY;\n  if (!key) {\n    throw new Error('STRIPE_SECRET_KEY is not set');\n  }\n  return new Stripe(key, { apiVersion: '2024-06-20' });\n}"
+                },
+                "after": {
+                  "startLine": 5,
+                  "endLine": 8,
+                  "bodyText": "export function getStripeClient(): Stripe {\n  return new Stripe(STRIPE_SECRET, { apiVersion: '2024-06-20' });\n}"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "output": {
+        "summary": "A hardcoded Stripe live secret key now replaces the environment variable lookup, eliminating the previous validation that required the key to be set. This change removes the error thrown when the key is missing and will always use the hardcoded value, regardless of environment configuration. As a result, the secret is exposed in source code and the application may behave unexpectedly in staging or production if the hardcoded key is incorrect.",
+        "riskLevel": "high",
+        "riskFlags": [
+          "hardcoded-secret",
+          "removed-validation",
+          "auth-change",
+          "payment-logic-change"
+        ],
+        "focusAreas": [
+          {
+            "file": "src/server/stripe-client.ts",
+            "lines": "1",
+            "reason": "Hardcoded Stripe live secret key exposes a sensitive credential in source code."
+          },
+          {
+            "file": "src/server/stripe-client.ts",
+            "lines": "6",
+            "reason": "Removal of environment variable validation means missing configuration will not fail early, potentially causing 401s or payment errors later."
+          }
+        ],
+        "tokensUsed": 2593,
+        "costUsdCents": 1,
+        "provider": "deepseek"
+      },
+      "score": {
+        "caseId": "case-006-hardcoded-secret",
+        "accuracy": 3,
+        "specificity": 3,
+        "riskCalibration": 3,
+        "conciseness": 2,
+        "notes": ""
+      },
+      "durationMs": 47772,
+      "error": null
+    },
+    {
+      "case": {
+        "id": "case-007-payment-logic-change",
+        "description": "Modifies the discount calculation to apply a higher cap, changing how promo codes affect order totals.",
+        "expectedRiskLevel": "high",
+        "expectedFlags": [
+          "payment-logic-change"
+        ],
+        "prMeta": {
+          "title": "Bump promo code cap for VIP tier",
+          "author": "casey-billing",
+          "filesChanged": 1,
+          "additions": 7,
+          "deletions": 4
+        },
+        "structuralDiff": [
+          {
+            "filename": "src/lib/pricing.ts",
+            "language": "typescript",
+            "supported": true,
+            "summary": {
+              "added": 0,
+              "removed": 0,
+              "modified": 1,
+              "unchanged": 2
+            },
+            "changes": [
+              {
+                "id": "applyDiscount",
+                "name": "applyDiscount",
+                "kind": "function",
+                "change": "modified",
+                "before": {
+                  "startLine": 18,
+                  "endLine": 32,
+                  "bodyText": "export function applyDiscount(order: Order, promo: PromoCode): Order {\n  if (!promo.active) return order;\n  const raw = order.subtotal * promo.percent;\n  const capped = Math.min(raw, 25);\n  const newSubtotal = order.subtotal - capped;\n  return {\n    ...order,\n    discount: capped,\n    subtotal: newSubtotal,\n    total: newSubtotal + order.tax,\n  };\n}"
+                },
+                "after": {
+                  "startLine": 18,
+                  "endLine": 35,
+                  "bodyText": "export function applyDiscount(order: Order, promo: PromoCode): Order {\n  if (!promo.active) return order;\n  const raw = order.subtotal * promo.percent;\n  const cap = order.customer.tier === 'vip' ? 100 : 25;\n  const capped = Math.min(raw, cap);\n  const newSubtotal = order.subtotal - capped;\n  return {\n    ...order,\n    discount: capped,\n    subtotal: newSubtotal,\n    total: newSubtotal + order.tax,\n  };\n}"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "output": {
+        "summary": "The discount cap is now dependent on the customer's tier, raising it from a fixed 25 to 100 for VIP customers. This change directly alters the final order total for qualifying VIP purchases. Reviewers should verify the intended cap amounts and ensure no other tiers require similar treatment.",
+        "riskLevel": "high",
+        "riskFlags": [
+          "payment-logic-change"
+        ],
+        "focusAreas": [
+          {
+            "file": "src/lib/pricing.ts",
+            "lines": "5-6",
+            "reason": "Discount cap now varies by customer tier, which could significantly increase discount amounts for VIPs."
+          }
+        ],
+        "tokensUsed": 2074,
+        "costUsdCents": 1,
+        "provider": "deepseek"
+      },
+      "score": {
+        "caseId": "case-007-payment-logic-change",
+        "accuracy": 3,
+        "specificity": 3,
+        "riskCalibration": 3,
+        "conciseness": 3,
+        "notes": ""
+      },
+      "durationMs": 29525,
+      "error": null
+    },
+    {
+      "case": {
+        "id": "case-008-input-validation-added",
+        "description": "Adds zod validation to a previously unchecked POST handler for /api/profile.",
+        "expectedRiskLevel": "low",
+        "expectedFlags": [],
+        "prMeta": {
+          "title": "harden: validate profile update payload",
+          "author": "rhea-secure",
+          "filesChanged": 1,
+          "additions": 11,
+          "deletions": 1
+        },
+        "structuralDiff": [
+          {
+            "filename": "src/app/api/profile/route.ts",
+            "language": "typescript",
+            "supported": true,
+            "summary": {
+              "added": 1,
+              "removed": 0,
+              "modified": 1,
+              "unchanged": 0
+            },
+            "changes": [
+              {
+                "id": "ProfileSchema",
+                "name": "ProfileSchema",
+                "kind": "const",
+                "change": "added",
+                "before": null,
+                "after": {
+                  "startLine": 4,
+                  "endLine": 9,
+                  "bodyText": "const ProfileSchema = z.object({\n  displayName: z.string().min(1).max(80),\n  bio: z.string().max(280).optional(),\n  avatarUrl: z.string().url().optional(),\n});"
+                }
+              },
+              {
+                "id": "POST",
+                "name": "POST",
+                "kind": "function",
+                "change": "modified",
+                "before": {
+                  "startLine": 11,
+                  "endLine": 17,
+                  "bodyText": "export async function POST(req: NextRequest) {\n  const body = await req.json();\n  const userId = await requireUserId(req);\n  await db.profile.update({ where: { userId }, data: body });\n  return NextResponse.json({ ok: true });\n}"
+                },
+                "after": {
+                  "startLine": 11,
+                  "endLine": 21,
+                  "bodyText": "export async function POST(req: NextRequest) {\n  const json = await req.json();\n  const parsed = ProfileSchema.safeParse(json);\n  if (!parsed.success) {\n    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });\n  }\n  const userId = await requireUserId(req);\n  await db.profile.update({ where: { userId }, data: parsed.data });\n  return NextResponse.json({ ok: true });\n}"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "output": {
+        "summary": "The POST handler for /api/profile now validates the request body using a Zod schema, returning a 400 error for invalid payloads. Previously, any JSON was passed directly to the database without validation. This ensures only properly formatted displayName, bio, and avatarUrl fields are accepted.",
+        "riskLevel": "low",
+        "riskFlags": [],
+        "focusAreas": [
+          {
+            "file": "src/app/api/profile/route.ts",
+            "lines": "6-10",
+            "reason": "Review the validation schema to ensure allowed field lengths and URL format match requirements."
+          },
+          {
+            "file": "src/app/api/profile/route.ts",
+            "lines": "14-17",
+            "reason": "Check that error response format is acceptable for client error handling."
+          }
+        ],
+        "tokensUsed": 2714,
+        "costUsdCents": 1,
+        "provider": "deepseek"
+      },
+      "score": {
+        "caseId": "case-008-input-validation-added",
+        "accuracy": 3,
+        "specificity": 3,
+        "riskCalibration": 3,
+        "conciseness": 3,
+        "notes": ""
+      },
+      "durationMs": 44070,
+      "error": null
+    },
+    {
+      "case": {
+        "id": "case-009-new-dependency",
+        "description": "Adds an import of a new third-party package (date-fns) and uses it inside a date-formatting utility.",
+        "expectedRiskLevel": "medium",
+        "expectedFlags": [
+          "dependency-added"
+        ],
+        "prMeta": {
+          "title": "feat: humanize timestamps with date-fns",
+          "author": "lin-frontend",
+          "filesChanged": 1,
+          "additions": 6,
+          "deletions": 3
+        },
+        "structuralDiff": [
+          {
+            "filename": "src/lib/dates.ts",
+            "language": "typescript",
+            "supported": true,
+            "summary": {
+              "added": 1,
+              "removed": 0,
+              "modified": 1,
+              "unchanged": 1
+            },
+            "changes": [
+              {
+                "id": "dateFnsImport",
+                "name": "formatDistanceToNow",
+                "kind": "const",
+                "change": "added",
+                "before": null,
+                "after": {
+                  "startLine": 1,
+                  "endLine": 1,
+                  "bodyText": "import { formatDistanceToNow } from 'date-fns';"
+                }
+              },
+              {
+                "id": "humanize",
+                "name": "humanize",
+                "kind": "function",
+                "change": "modified",
+                "before": {
+                  "startLine": 3,
+                  "endLine": 8,
+                  "bodyText": "export function humanize(iso: string): string {\n  const ms = Date.now() - new Date(iso).getTime();\n  const minutes = Math.floor(ms / 60000);\n  if (minutes < 1) return 'just now';\n  return `${minutes}m ago`;\n}"
+                },
+                "after": {
+                  "startLine": 3,
+                  "endLine": 6,
+                  "bodyText": "export function humanize(iso: string): string {\n  return formatDistanceToNow(new Date(iso), { addSuffix: true });\n}"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "output": {
+        "summary": "The humanize function replaced its custom relative time logic with date-fns' formatDistanceToNow, altering the output strings significantly. Previously returning 'just now' or 'Xm ago', it now returns locale-aware phrases like 'less than a minute ago' or 'about 2 hours ago'. This changes all user-facing timestamp displays wherever humanize is used.",
+        "riskLevel": "medium",
+        "riskFlags": [
+          "dependency-added"
+        ],
+        "focusAreas": [
+          {
+            "file": "src/lib/dates.ts",
+            "lines": "3-8",
+            "reason": "The humanize function now uses formatDistanceToNow, changing the output format and possibly breaking UI expectations."
+          }
+        ],
+        "tokensUsed": 3032,
+        "costUsdCents": 1,
+        "provider": "deepseek"
+      },
+      "score": {
+        "caseId": "case-009-new-dependency",
+        "accuracy": 3,
+        "specificity": 3,
+        "riskCalibration": 3,
+        "conciseness": 2,
+        "notes": ""
+      },
+      "durationMs": 55990,
+      "error": null
+    },
+    {
+      "case": {
+        "id": "case-010-multi-file-refactor",
+        "description": "Mechanical rename of getCurrentUser to getViewer across five files. No logic changes.",
+        "expectedRiskLevel": "low",
+        "expectedFlags": [],
+        "prMeta": {
+          "title": "rename: getCurrentUser -> getViewer",
+          "author": "noor-cleanup",
+          "filesChanged": 5,
+          "additions": 5,
+          "deletions": 5
+        },
+        "structuralDiff": [
+          {
+            "filename": "src/server/viewer.ts",
+            "language": "typescript",
+            "supported": true,
+            "summary": {
+              "added": 1,
+              "removed": 1,
+              "modified": 0,
+              "unchanged": 0
+            },
+            "changes": [
+              {
+                "id": "getCurrentUser",
+                "name": "getCurrentUser",
+                "kind": "function",
+                "change": "removed",
+                "before": {
+                  "startLine": 4,
+                  "endLine": 9,
+                  "bodyText": "export async function getCurrentUser(req: NextRequest): Promise<User | null> {\n  const session = await readSession(req);\n  if (!session) return null;\n  return loadUser(session.userId);\n}"
+                },
+                "after": null
+              },
+              {
+                "id": "getViewer",
+                "name": "getViewer",
+                "kind": "function",
+                "change": "added",
+                "before": null,
+                "after": {
+                  "startLine": 4,
+                  "endLine": 9,
+                  "bodyText": "export async function getViewer(req: NextRequest): Promise<User | null> {\n  const session = await readSession(req);\n  if (!session) return null;\n  return loadUser(session.userId);\n}"
+                }
+              }
+            ]
+          },
+          {
+            "filename": "src/app/api/me/route.ts",
+            "language": "typescript",
+            "supported": true,
+            "summary": {
+              "added": 0,
+              "removed": 0,
+              "modified": 1,
+              "unchanged": 0
+            },
+            "changes": [
+              {
+                "id": "GET",
+                "name": "GET",
+                "kind": "function",
+                "change": "modified",
+                "before": {
+                  "startLine": 5,
+                  "endLine": 9,
+                  "bodyText": "export async function GET(req: NextRequest) {\n  const user = await getCurrentUser(req);\n  if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });\n  return NextResponse.json(user);\n}"
+                },
+                "after": {
+                  "startLine": 5,
+                  "endLine": 9,
+                  "bodyText": "export async function GET(req: NextRequest) {\n  const user = await getViewer(req);\n  if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });\n  return NextResponse.json(user);\n}"
+                }
+              }
+            ]
+          },
+          {
+            "filename": "src/app/api/posts/route.ts",
+            "language": "typescript",
+            "supported": true,
+            "summary": {
+              "added": 0,
+              "removed": 0,
+              "modified": 1,
+              "unchanged": 0
+            },
+            "changes": [
+              {
+                "id": "POST",
+                "name": "POST",
+                "kind": "function",
+                "change": "modified",
+                "before": {
+                  "startLine": 8,
+                  "endLine": 14,
+                  "bodyText": "export async function POST(req: NextRequest) {\n  const user = await getCurrentUser(req);\n  if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });\n  const body = await req.json();\n  const post = await createPost(user.id, body);\n  return NextResponse.json(post, { status: 201 });\n}"
+                },
+                "after": {
+                  "startLine": 8,
+                  "endLine": 14,
+                  "bodyText": "export async function POST(req: NextRequest) {\n  const user = await getViewer(req);\n  if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });\n  const body = await req.json();\n  const post = await createPost(user.id, body);\n  return NextResponse.json(post, { status: 201 });\n}"
+                }
+              }
+            ]
+          },
+          {
+            "filename": "src/server/comments.ts",
+            "language": "typescript",
+            "supported": true,
+            "summary": {
+              "added": 0,
+              "removed": 0,
+              "modified": 1,
+              "unchanged": 1
+            },
+            "changes": [
+              {
+                "id": "addComment",
+                "name": "addComment",
+                "kind": "function",
+                "change": "modified",
+                "before": {
+                  "startLine": 10,
+                  "endLine": 16,
+                  "bodyText": "export async function addComment(req: NextRequest, postId: string, text: string) {\n  const user = await getCurrentUser(req);\n  if (!user) throw new Error('unauthenticated');\n  return db.comment.create({ data: { postId, authorId: user.id, text } });\n}"
+                },
+                "after": {
+                  "startLine": 10,
+                  "endLine": 16,
+                  "bodyText": "export async function addComment(req: NextRequest, postId: string, text: string) {\n  const user = await getViewer(req);\n  if (!user) throw new Error('unauthenticated');\n  return db.comment.create({ data: { postId, authorId: user.id, text } });\n}"
+                }
+              }
+            ]
+          },
+          {
+            "filename": "src/server/notifications.ts",
+            "language": "typescript",
+            "supported": true,
+            "summary": {
+              "added": 0,
+              "removed": 0,
+              "modified": 1,
+              "unchanged": 2
+            },
+            "changes": [
+              {
+                "id": "listUnread",
+                "name": "listUnread",
+                "kind": "function",
+                "change": "modified",
+                "before": {
+                  "startLine": 12,
+                  "endLine": 17,
+                  "bodyText": "export async function listUnread(req: NextRequest) {\n  const user = await getCurrentUser(req);\n  if (!user) return [];\n  return db.notification.findMany({ where: { userId: user.id, readAt: null } });\n}"
+                },
+                "after": {
+                  "startLine": 12,
+                  "endLine": 17,
+                  "bodyText": "export async function listUnread(req: NextRequest) {\n  const user = await getViewer(req);\n  if (!user) return [];\n  return db.notification.findMany({ where: { userId: user.id, readAt: null } });\n}"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "output": {
+        "summary": "The function previously named getCurrentUser has been renamed to getViewer. All internal callers have been updated to use the new name. This is a purely cosmetic change with no behavioral impact.",
+        "riskLevel": "low",
+        "riskFlags": [],
+        "focusAreas": [
+          {
+            "file": "src/server/viewer.ts",
+            "lines": "1-6",
+            "reason": "Verify that the renamed function is identical in implementation and that no external consumers still reference the old name."
+          }
+        ],
+        "tokensUsed": 2468,
+        "costUsdCents": 1,
+        "provider": "deepseek"
+      },
+      "score": {
+        "caseId": "case-010-multi-file-refactor",
+        "accuracy": 3,
+        "specificity": 3,
+        "riskCalibration": 3,
+        "conciseness": 3,
+        "notes": ""
+      },
+      "durationMs": 22927,
+      "error": null
+    }
+  ],
+  "totalScore": 105,
+  "maxScore": 120
+}

@@ -1,0 +1,51 @@
+{
+  "id": "case-009-new-dependency",
+  "description": "Adds an import of a new third-party package (date-fns) and uses it inside a date-formatting utility.",
+  "expectedRiskLevel": "medium",
+  "expectedFlags": ["dependency-added"],
+  "prMeta": {
+    "title": "feat: humanize timestamps with date-fns",
+    "author": "lin-frontend",
+    "filesChanged": 1,
+    "additions": 6,
+    "deletions": 3
+  },
+  "structuralDiff": [
+    {
+      "filename": "src/lib/dates.ts",
+      "language": "typescript",
+      "supported": true,
+      "summary": { "added": 1, "removed": 0, "modified": 1, "unchanged": 1 },
+      "changes": [
+        {
+          "id": "dateFnsImport",
+          "name": "formatDistanceToNow",
+          "kind": "const",
+          "change": "added",
+          "before": null,
+          "after": {
+            "startLine": 1,
+            "endLine": 1,
+            "bodyText": "import { formatDistanceToNow } from 'date-fns';"
+          }
+        },
+        {
+          "id": "humanize",
+          "name": "humanize",
+          "kind": "function",
+          "change": "modified",
+          "before": {
+            "startLine": 3,
+            "endLine": 8,
+            "bodyText": "export function humanize(iso: string): string {\n  const ms = Date.now() - new Date(iso).getTime();\n  const minutes = Math.floor(ms / 60000);\n  if (minutes < 1) return 'just now';\n  return `${minutes}m ago`;\n}"
+          },
+          "after": {
+            "startLine": 3,
+            "endLine": 6,
+            "bodyText": "export function humanize(iso: string): string {\n  return formatDistanceToNow(new Date(iso), { addSuffix: true });\n}"
+          }
+        }
+      ]
+    }
+  ]
+}
