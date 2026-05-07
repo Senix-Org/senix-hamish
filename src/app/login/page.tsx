@@ -1,16 +1,18 @@
 import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
-import SignInButton from '@/components/sign-in-button';
+import AutoSignIn from '@/components/auto-sign-in';
+import { SiteNav } from '@/components/site-nav';
 
 export const dynamic = 'force-dynamic';
 
 type SearchParams = { next?: string; installation_id?: string };
 
 /**
- * Sign-in page. If the visitor already has a valid session we send them
- * straight to `next` (default `/dashboard`). The `installation_id` query
- * param is preserved through the round-trip so that landing on /setup
- * mid-OAuth still surfaces the right install id.
+ * Sign-in route. Already-authenticated visitors skip straight to `next`
+ * (default `/dashboard`); everyone else is bounced into GitHub OAuth on
+ * mount via `<AutoSignIn>`. There is no manual button — clicking "Sign
+ * in" anywhere in the app should land on the dashboard with one
+ * external authorize step.
  */
 export default async function LoginPage({
   searchParams,
@@ -27,17 +29,21 @@ export default async function LoginPage({
   }
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center p-6">
-      <div className="max-w-sm w-full text-center">
-        <h1 className="text-3xl font-bold mb-3">Sign in to Senix</h1>
-        <p className="text-zinc-400 mb-8">
-          We use your GitHub account to link your installs and analyses.
-        </p>
-        <div className="flex justify-center">
-          <SignInButton next={next} />
+    <>
+      <SiteNav />
+      <main className="relative min-h-[calc(100vh-3.5rem)] overflow-hidden flex items-center justify-center px-5 sm:px-6 py-16">
+        <div aria-hidden className="absolute inset-0 bg-grid opacity-50" />
+        <div
+          aria-hidden
+          className="absolute -top-32 left-1/2 -translate-x-1/2 w-[700px] h-[500px] bg-glow-green pointer-events-none"
+        />
+        <div className="relative max-w-sm w-full">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 backdrop-blur p-8 shadow-2xl shadow-green-950/20">
+            <AutoSignIn next={next} />
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </>
   );
 }
 

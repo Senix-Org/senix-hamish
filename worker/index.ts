@@ -1,10 +1,23 @@
 import 'dotenv/config';
 import { dequeue, ackJob, nackJob, Job } from '../src/lib/queue';
 import { processAnalyzePr } from './handlers/analyze-pr';
+import { log } from './log';
 
 const POLL_INTERVAL_MS = 2000;
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 const HEARTBEAT_INTERVAL_MS = 60_000;
+
+const REQUIRED_ENV_VARS = [
+  'UPSTASH_REDIS_REST_URL',
+  'UPSTASH_REDIS_REST_TOKEN',
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'GITHUB_APP_ID',
+  'GITHUB_APP_PRIVATE_KEY',
+  'GITHUB_WEBHOOK_SECRET',
+  'DEEPSEEK_API_KEY',
+  'LLM_PROVIDER',
+] as const;
 
 let shuttingDown = false;
 let inFlight = 0;
@@ -12,9 +25,31 @@ let processedCount = 0;
 let failedCount = 0;
 let heartbeatTimer: NodeJS.Timeout | null = null;
 
+/**
+ * Verify every required env var is present at startup. Logs which one is
+ * missing and exits with code 1 if any are absent — production logs surface
+ * the misconfiguration immediately instead of failing on the first job.
+ */
+function validateEnv(): void {
+  const missing = REQUIRED_ENV_VARS.filter((name) => {
+    const value = process.env[name];
+    return value === undefined || value.trim() === '';
+  });
+
+  if (missing.length > 0) {
+    for (const name of missing) {
+      log.error('missing required env var', { var: name });
+    }
+    log.error('worker cannot start with missing env', { count: missing.length });
+    process.exit(1);
+  }
+
+  log.info('env validated', { vars: REQUIRED_ENV_VARS.length });
+}
+
 async function processJob(job: Job): Promise<void> {
   const startedAt = Date.now();
-  console.log(`[worker] picked up job ${job.id} (kind=${job.kind}, attempt=${job.attempts + 1})`);
+  log.info('picked up job', { id: job.id, kind: job.kind, attempt: job.attempts + 1 });
 
   try {
     switch (job.kind) {
@@ -22,25 +57,26 @@ async function processJob(job: Job): Promise<void> {
         await processAnalyzePr(job.payload);
         break;
       default: {
-        // Exhaustiveness check
         const exhaustive: never = job.kind;
         throw new Error(`Unhandled job kind: ${exhaustive}`);
       }
     }
     await ackJob(job);
     processedCount++;
-    console.log(`[worker] ✅ ${job.id} done in ${Date.now() - startedAt}ms`);
+    log.info('job done', { id: job.id, durationMs: Date.now() - startedAt });
   } catch (err: any) {
     const message = err?.message ?? String(err);
     const willRetry = await nackJob(job, message);
     failedCount++;
-    console.error(
-      `[worker] ❌ ${job.id} failed: ${message} — ${willRetry ? 'will retry' : 'dropped'}`
-    );
+    log.error('job failed', {
+      id: job.id,
+      message,
+      retry: willRetry ? 'will-retry' : 'dropped',
+    });
   }
 }
 
-async function loop() {
+async function loop(): Promise<void> {
   while (!shuttingDown) {
     const job = await dequeue();
     if (!job) {
@@ -66,31 +102,31 @@ function sleep(ms: number): Promise<void> {
  */
 function startHeartbeat(): void {
   heartbeatTimer = setInterval(() => {
-    console.log(
-      `[worker] heartbeat — processed=${processedCount} failed=${failedCount} inFlight=${inFlight}`
-    );
+    log.info('heartbeat', {
+      processed: processedCount,
+      failed: failedCount,
+      inFlight,
+    });
   }, HEARTBEAT_INTERVAL_MS);
 }
 
-function setupShutdown() {
-  const handler = async (signal: string) => {
+function setupShutdown(): void {
+  const handler = async (signal: string): Promise<void> => {
     if (shuttingDown) return;
     shuttingDown = true;
     if (heartbeatTimer) {
       clearInterval(heartbeatTimer);
       heartbeatTimer = null;
     }
-    console.log(`[worker] received ${signal}, draining ${inFlight} in-flight jobs...`);
+    log.info('shutting down', { signal, draining: inFlight });
     const start = Date.now();
     while (inFlight > 0 && Date.now() - start < SHUTDOWN_TIMEOUT_MS) {
       await sleep(200);
     }
     if (inFlight > 0) {
-      console.warn(`[worker] forced exit with ${inFlight} jobs still running`);
+      log.warn('forced exit', { inFlight });
     } else {
-      console.log(
-        `[worker] clean exit — processed=${processedCount} failed=${failedCount}`
-      );
+      log.info('clean exit', { processed: processedCount, failed: failedCount });
     }
     process.exit(0);
   };
@@ -98,14 +134,19 @@ function setupShutdown() {
   process.on('SIGTERM', () => handler('SIGTERM'));
 }
 
-async function main() {
+async function main(): Promise<void> {
+  validateEnv();
   setupShutdown();
   startHeartbeat();
-  console.log('[worker] starting, polling every', POLL_INTERVAL_MS, 'ms');
+  log.info('starting', {
+    pollIntervalMs: POLL_INTERVAL_MS,
+    logFormat: process.env.WORKER_LOG_FORMAT ?? 'text',
+    provider: process.env.LLM_PROVIDER,
+  });
   await loop();
 }
 
 main().catch((err) => {
-  console.error('[worker] fatal error:', err);
+  log.error('fatal error', { message: err?.message ?? String(err) });
   process.exit(1);
 });

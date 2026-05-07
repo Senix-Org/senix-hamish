@@ -37,7 +37,10 @@ import { supabaseAdmin } from '@/lib/supabase';
        return `installation:${action}:${installationId}`;
      }
    
-     // Upsert the installation row (created, new_permissions_accepted, etc.)
+     // Upsert the installation row (created, new_permissions_accepted, etc.).
+     // Re-installing the same github_installation_id clears `uninstalled_at`
+     // so prior history (repos, PRs, analyses) reactivates instead of being
+     // duplicated.
      const account = installation.account;
      const { data: installRow, error: installError } = await supabaseAdmin
        .from('installations')
@@ -47,6 +50,7 @@ import { supabaseAdmin } from '@/lib/supabase';
            account_login: account.login,
            account_type: account.type,
            suspended: false,
+           uninstalled_at: null,
          },
          { onConflict: 'github_installation_id' }
        )

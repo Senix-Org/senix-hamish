@@ -6,7 +6,7 @@ Scoring is done by a human, not an LLM. The runner produces output; you read it 
 
 ## Dimensions
 
-### Accuracy — "Did it correctly describe what changed?"
+### Accuracy — "Did it correctly describe what changed?".
 
 - **3** — Output correctly describes the actual behavior change with no factual errors. The reviewer reading just the summary would understand what the PR does.
 - **2** — Mostly correct with a minor inaccuracy. E.g. wrong line numbers, oversimplified, missed a small detail, or overstated something secondary.

@@ -1,9 +1,10 @@
-import Link from 'next/link';
 import Image from 'next/image';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase';
 import SignOutButton from '@/components/sign-out-button';
+import { SiteNav } from '@/components/site-nav';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -22,10 +23,8 @@ type AuthUserMeta = {
 
 /**
  * Authenticated dashboard shell. Redirects unauthenticated visitors to
- * /login. Loads the signed-in user's installations and per-install repo
- * counts (via supabaseAdmin — RLS isn't strictly required here since
- * we've already checked the auth user, and we want a single sidebar
- * query path).
+ * /login. Reuses the public SiteNav and slots a dashboard-specific
+ * right-hand cluster (avatar / feedback / sign out).
  */
 export default async function DashboardLayout({
   children,
@@ -42,37 +41,48 @@ export default async function DashboardLayout({
   const meta = (authData.user.user_metadata ?? {}) as AuthUserMeta;
   const handle = meta.user_name ?? meta.preferred_username ?? authData.user.email ?? 'You';
 
+  const dashboardRight = (
+    <>
+      <Link
+        href="/dashboard"
+        className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors"
+      >
+        Dashboard
+      </Link>
+      <a
+        href="mailto:feedback@senix.app"
+        className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors"
+      >
+        Send feedback
+      </a>
+      <div className="flex items-center gap-2 pl-3 border-l border-zinc-800">
+        {meta.avatar_url && (
+          <Image
+            src={meta.avatar_url}
+            alt={handle}
+            width={24}
+            height={24}
+            className="rounded-full border border-zinc-800"
+            unoptimized
+          />
+        )}
+        <span className="text-sm text-zinc-300 hidden lg:inline">{handle}</span>
+      </div>
+      <SignOutButton />
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
-          <Link href="/dashboard" className="font-bold tracking-tight">
-            Senix
-          </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-zinc-400">{handle}</span>
-            {meta.avatar_url && (
-              <Image
-                src={meta.avatar_url}
-                alt={handle}
-                width={28}
-                height={28}
-                className="rounded-full border border-zinc-800"
-                unoptimized
-              />
-            )}
-            <SignOutButton />
-          </div>
-        </div>
-      </header>
+      <SiteNav rightSlot={dashboardRight} />
 
-      <div className="max-w-6xl mx-auto px-6 py-8 grid grid-cols-1 md:grid-cols-[200px_1fr] gap-8">
+      <div className="max-w-6xl mx-auto px-5 sm:px-6 py-10 grid grid-cols-1 md:grid-cols-[200px_1fr] gap-10">
         {installs.length > 0 && (
           <aside className="hidden md:block">
-            <div className="text-xs uppercase tracking-wide text-zinc-500 mb-2">
+            <div className="text-xs uppercase tracking-[0.18em] text-zinc-500 mb-3">
               Installations
             </div>
-            <ul className="space-y-1">
+            <ul className="space-y-1.5">
               {installs.map((i) => (
                 <li key={i.id} className="text-sm text-zinc-300">
                   <span className="font-medium">{i.account_login}</span>
@@ -102,6 +112,7 @@ async function loadInstallations(authUserId: string): Promise<SidebarInstallatio
     .from('installations')
     .select('id, account_login, repositories(count)')
     .eq('installed_by_user_id', userRow.id)
+    .is('uninstalled_at', null)
     .order('account_login', { ascending: true })) as unknown as {
     data: Array<{ id: string; account_login: string; repositories: Array<{ count: number }> }> | null;
   };

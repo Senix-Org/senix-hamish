@@ -40,8 +40,8 @@ export default function RepoToggle({ repoId, enabled }: Props): React.ReactEleme
         onClick={onToggle}
         disabled={isPending}
         aria-pressed={optimistic}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition disabled:opacity-50 ${
-          optimistic ? 'bg-green-500/70' : 'bg-zinc-700'
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 ${
+          optimistic ? 'bg-green-500' : 'bg-zinc-700 hover:bg-zinc-600'
         }`}
       >
         <span

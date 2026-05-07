@@ -12,6 +12,7 @@ const MAX_FILES_FOR_STRUCTURAL_DIFF = 50;
 const DEFAULT_DASHBOARD_URL = 'https://senix.vercel.app';
 
 type PrRow = { title: string | null; author_login: string | null };
+type InstallationStatusRow = { uninstalled_at: string | null };
 type PriorCommentRow = { github_comment_id: number | null };
 type CommentOutcome = { commentId: number | null; commentUrl: string | null; postError: string | null };
 type CommentContext = { pullRequestId: string; installationId: number; owner: string; repo: string; prNumber: number };
@@ -28,6 +29,28 @@ export async function processAnalyzePr(
 ): Promise<void> {
   const { analysisId, pullRequestId, installationId, owner, repo, prNumber, headSha, baseSha } =
     payload;
+
+  const { data: installRow } = await supabaseAdmin
+    .from('installations')
+    .select('uninstalled_at')
+    .eq('github_installation_id', installationId)
+    .maybeSingle();
+  const installation = (installRow ?? null) as unknown as InstallationStatusRow | null;
+
+  if (installation?.uninstalled_at) {
+    console.log(
+      `[worker] skipping job — installation uninstalled (id=${installationId}, at=${installation.uninstalled_at})`
+    );
+    await supabaseAdmin
+      .from('analyses')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        error_message: 'skipped: installation uninstalled',
+      })
+      .eq('id', analysisId);
+    return;
+  }
 
   await supabaseAdmin.from('analyses').update({ status: 'running' }).eq('id', analysisId);
 
