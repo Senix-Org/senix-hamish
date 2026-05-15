@@ -55,7 +55,7 @@ export default async function DashboardLayout({
       >
         Send feedback
       </a>
-      <div className="flex items-center gap-2 pl-3 border-l border-zinc-800">
+      <div className="flex items-center gap-2 pl-3 border-l border-zinc-800 cursor-default select-none">
         {meta.avatar_url && (
           <Image
             src={meta.avatar_url}
@@ -68,6 +68,7 @@ export default async function DashboardLayout({
         )}
         <span className="text-sm text-zinc-300 hidden lg:inline">{handle}</span>
       </div>
+      <div className="border-l border-zinc-800 h-6 mx-3" />
       <SignOutButton />
     </>
   );

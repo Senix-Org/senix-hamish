@@ -1,17 +1,13 @@
 import Link from 'next/link';
-import { ArrowUpRight, GitBranch } from 'lucide-react';
+import { GitBranch } from 'lucide-react';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import RepoToggle from '@/components/repo-toggle';
-import { Reveal, RevealItem, RevealStagger } from '@/components/reveal';
+import { Reveal } from '@/components/reveal';
+import { RecentAnalyses } from '@/components/dashboard/recent-analyses';
+import type { AnalysisCardData } from '@/components/dashboard/analysis-card';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-const RISK_BADGE: Record<string, string> = {
-  low: 'text-green-400 bg-green-950/40 border-green-900/50',
-  medium: 'text-yellow-400 bg-yellow-950/40 border-yellow-900/50',
-  high: 'text-red-400 bg-red-950/40 border-red-900/50',
-};
 
 type AnalysisRow = {
   id: string;
@@ -69,6 +65,17 @@ export default async function DashboardPage(): Promise<React.ReactElement> {
     (a) => Date.now() - new Date(a.created_at).getTime() < 7 * 24 * 60 * 60 * 1000
   ).length;
 
+  const analysisCards: AnalysisCardData[] = analyses.map((a) => ({
+    id: a.id,
+    summary: a.summary,
+    risk_level: a.risk_level,
+    created_at: a.created_at,
+    github_comment_url: a.github_comment_url,
+    pr_title: a.pull_requests?.title ?? '(untitled PR)',
+    pr_number: a.pull_requests?.github_pr_number ?? null,
+    repo_name: a.pull_requests?.repositories?.full_name ?? 'unknown',
+  }));
+
   return (
     <div className="space-y-12">
       <Reveal>
@@ -97,13 +104,7 @@ export default async function DashboardPage(): Promise<React.ReactElement> {
               within ~30 seconds. We&apos;ll show it here as soon as it&apos;s ready.
             </EmptyCard>
           ) : (
-            <RevealStagger className="space-y-3" staggerMs={40}>
-              {analyses.map((a) => (
-                <RevealItem key={a.id}>
-                  <AnalysisListItem analysis={a} />
-                </RevealItem>
-              ))}
-            </RevealStagger>
+            <RecentAnalyses analyses={analysisCards} />
           )}
         </section>
       </Reveal>
@@ -111,6 +112,10 @@ export default async function DashboardPage(): Promise<React.ReactElement> {
       <Reveal delay={0.1}>
         <section>
           <SectionHeading title="Connected repos" />
+          <p className="text-sm text-zinc-400 mt-1 mb-4">
+            Toggle off any repo you don&apos;t want Senix reviewing. Disabled repos skip all
+            analyses.
+          </p>
           {repos.length === 0 ? (
             <EmptyCard>
               No repos connected yet.{' '}
@@ -166,64 +171,5 @@ function EmptyCard({ children }: { children: React.ReactNode }): React.ReactElem
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6 text-zinc-400 text-sm leading-relaxed">
       {children}
     </div>
-  );
-}
-
-function AnalysisListItem({ analysis }: { analysis: AnalysisRow }): React.ReactElement {
-  const repoName = analysis.pull_requests?.repositories?.full_name ?? 'unknown';
-  const prNumber = analysis.pull_requests?.github_pr_number;
-  const prTitle = analysis.pull_requests?.title ?? '(untitled PR)';
-  const riskBadgeClass =
-    (analysis.risk_level && RISK_BADGE[analysis.risk_level]) ??
-    'text-zinc-400 bg-zinc-800 border-zinc-700';
-
-  return (
-    <li className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 hover:border-zinc-700 hover:bg-zinc-900/60 transition-colors">
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-xs text-zinc-500 mb-1.5">
-            <span className="text-zinc-300 font-mono truncate">{repoName}</span>
-            {prNumber !== undefined && (
-              <span className="text-zinc-500 font-mono">#{prNumber}</span>
-            )}
-            <span className="text-zinc-700">·</span>
-            <span>{new Date(analysis.created_at).toLocaleString()}</span>
-          </div>
-          <div className="text-zinc-100 font-medium mb-1.5 truncate">{prTitle}</div>
-          {analysis.summary && (
-            <p className="text-sm text-zinc-400 line-clamp-2 leading-relaxed">
-              {analysis.summary}
-            </p>
-          )}
-        </div>
-        {analysis.risk_level && (
-          <span
-            className={`shrink-0 text-[10px] tracking-wider rounded-full px-2.5 py-1 font-bold uppercase border ${riskBadgeClass}`}
-          >
-            {analysis.risk_level}
-          </span>
-        )}
-      </div>
-      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-        <Link
-          href={`/dashboard/analysis/${analysis.id}`}
-          className="inline-flex items-center gap-1 text-zinc-300 hover:text-zinc-100 transition-colors"
-        >
-          Details
-          <ArrowUpRight size={12} className="-mr-0.5" />
-        </Link>
-        {analysis.github_comment_url && (
-          <a
-            href={analysis.github_comment_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-zinc-500 hover:text-green-400 transition-colors"
-          >
-            View on GitHub
-            <ArrowUpRight size={12} />
-          </a>
-        )}
-      </div>
-    </li>
   );
 }

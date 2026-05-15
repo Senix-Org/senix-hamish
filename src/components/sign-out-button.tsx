@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { LogOut } from 'lucide-react';
 import { createBrowserSupabaseClient } from '@/lib/supabase-browser';
 
 /**
@@ -25,9 +26,11 @@ export default function SignOutButton(): React.ReactElement {
       type="button"
       onClick={onClick}
       disabled={busy}
-      className="text-sm text-zinc-400 hover:text-zinc-200 disabled:opacity-50"
+      className="inline-flex items-center gap-1.5 p-2 rounded text-sm text-zinc-400 hover:text-red-400 hover:bg-zinc-900 disabled:opacity-50 transition-colors"
+      aria-label="Sign out"
     >
-      {busy ? 'Signing out…' : 'Sign out'}
+      <LogOut size={14} />
+      <span>{busy ? 'Signing out…' : 'Sign out'}</span>
     </button>
   );
 }
