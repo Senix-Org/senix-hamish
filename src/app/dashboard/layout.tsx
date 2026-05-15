@@ -1,10 +1,7 @@
-import Image from 'next/image';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase';
-import SignOutButton from '@/components/sign-out-button';
-import { SiteNav } from '@/components/site-nav';
+import { AppNav } from '@/components/app-nav';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -23,8 +20,8 @@ type AuthUserMeta = {
 
 /**
  * Authenticated dashboard shell. Redirects unauthenticated visitors to
- * /login. Reuses the public SiteNav and slots a dashboard-specific
- * right-hand cluster (avatar / feedback / sign out).
+ * /login. Uses the focused AppNav (no marketing links) rather than the
+ * public SiteNav.
  */
 export default async function DashboardLayout({
   children,
@@ -41,41 +38,9 @@ export default async function DashboardLayout({
   const meta = (authData.user.user_metadata ?? {}) as AuthUserMeta;
   const handle = meta.user_name ?? meta.preferred_username ?? authData.user.email ?? 'You';
 
-  const dashboardRight = (
-    <>
-      <Link
-        href="/dashboard"
-        className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors"
-      >
-        Dashboard
-      </Link>
-      <a
-        href="mailto:feedback@senix.app"
-        className="text-sm text-zinc-400 hover:text-zinc-100 transition-colors"
-      >
-        Send feedback
-      </a>
-      <div className="flex items-center gap-2 pl-3 border-l border-zinc-800 cursor-default select-none">
-        {meta.avatar_url && (
-          <Image
-            src={meta.avatar_url}
-            alt={handle}
-            width={24}
-            height={24}
-            className="rounded-full border border-zinc-800"
-            unoptimized
-          />
-        )}
-        <span className="text-sm text-zinc-300 hidden lg:inline">{handle}</span>
-      </div>
-      <div className="border-l border-zinc-800 h-6 mx-3" />
-      <SignOutButton />
-    </>
-  );
-
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <SiteNav rightSlot={dashboardRight} />
+      <AppNav handle={handle} avatarUrl={meta.avatar_url} />
 
       <div className="max-w-6xl mx-auto px-5 sm:px-6 py-10 grid grid-cols-1 md:grid-cols-[200px_1fr] gap-10">
         {installs.length > 0 && (
