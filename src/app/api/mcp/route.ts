@@ -1,9 +1,7 @@
 import { createHash } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { diffFile, type FileStructuralDiff } from '@/lib/structural-diff';
-import { getLLMProvider } from '@/lib/llm';
-import type { AnalysisResult } from '@/lib/llm/types';
+import { formatShippingBrief, runAnalysis } from '@/lib/analyze-changes';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -142,13 +140,6 @@ type JsonRpcRequest = {
   params?: Record<string, unknown>;
 };
 
-type FileChange = {
-  file_path: string;
-  language?: string;
-  before: string;
-  after: string;
-};
-
 type McpTokenRow = { id: string; user_id: string };
 
 function rpcResult(id: JsonRpcId, result: unknown) {
@@ -193,122 +184,6 @@ async function verifyToken(req: NextRequest): Promise<McpTokenRow | null> {
   return data;
 }
 
-function isFileChange(value: unknown): value is FileChange {
-  if (!value || typeof value !== 'object') return false;
-  const v = value as Record<string, unknown>;
-  return (
-    typeof v.file_path === 'string' &&
-    typeof v.before === 'string' &&
-    typeof v.after === 'string'
-  );
-}
-
-/** Crude but reasonable additions/deletions estimate from line counts. */
-function lineDelta(before: string, after: string): { additions: number; deletions: number } {
-  const beforeLines = before === '' ? 0 : before.split('\n').length;
-  const afterLines = after === '' ? 0 : after.split('\n').length;
-  return {
-    additions: Math.max(0, afterLines - beforeLines) || (before === '' ? afterLines : 0),
-    deletions: Math.max(0, beforeLines - afterLines) || (after === '' ? beforeLines : 0),
-  };
-}
-
-/**
- * Render the analysis as the human-readable shipping brief shown in the
- * IDE's chat panel. The structured fields stay on `structuredContent`;
- * this is the prose version a developer reads at a glance.
- */
-function formatToolText(result: AnalysisResult, filesReviewed: number): string {
-  const fileWord = filesReviewed === 1 ? 'file' : 'files';
-  const lines: string[] = [
-    `Senix reviewed ${filesReviewed} changed ${fileWord}.`,
-    '',
-    `Overall risk: ${result.riskLevel.toUpperCase()}`,
-    '',
-    'Behavioral summary:',
-    result.summary,
-    '',
-    `Ship decision: ${result.shipDecision}`,
-    '',
-  ];
-
-  if (result.riskyFiles.length > 0) {
-    lines.push('Risky files:');
-    result.riskyFiles.forEach((file, index) => {
-      const location = file.lineRange ? `${file.file}:${file.lineRange}` : file.file;
-      const heading = file.symbol ? `${location} (${file.symbol})` : location;
-      lines.push(`${index + 1}. ${heading}`);
-      lines.push(`   What changed: ${file.whatChanged}`);
-      lines.push(`   Why risky: ${file.whyRisky}`);
-      lines.push(`   How to verify: ${file.howToVerify}`);
-      lines.push(`   Suggested fix: ${file.suggestedFix}`);
-      lines.push('');
-    });
-    lines.pop(); // Drop the trailing blank line after the last risky file.
-  } else {
-    lines.push('No high-risk changes detected.');
-  }
-
-  if (result.verificationSteps.length > 0) {
-    lines.push('', 'Verification steps:');
-    result.verificationSteps.forEach((step, index) => {
-      lines.push(`${index + 1}. ${step}`);
-    });
-  }
-
-  return lines.join('\n');
-}
-
-/** Run the IDE-supplied changes through the shared analysis pipeline. */
-async function runAnalysis(
-  args: Record<string, unknown>
-): Promise<{ result: AnalysisResult; filesReviewed: number }> {
-  const rawChanges = args.changes;
-  if (!Array.isArray(rawChanges) || rawChanges.length === 0) {
-    throw new Error('`changes` must be a non-empty array of file changes.');
-  }
-
-  const changes: FileChange[] = [];
-  for (const item of rawChanges) {
-    if (!isFileChange(item)) {
-      throw new Error(
-        'Each change must have string `file_path`, `before`, and `after` fields.'
-      );
-    }
-    changes.push(item);
-  }
-
-  const structuralDiff: FileStructuralDiff[] = [];
-  let additions = 0;
-  let deletions = 0;
-
-  for (const change of changes) {
-    // Empty string means "no such file on that side" (new file / deletion).
-    const before = change.before === '' ? null : change.before;
-    const after = change.after === '' ? null : change.after;
-    structuralDiff.push(diffFile(change.file_path, before, after));
-
-    const delta = lineDelta(change.before, change.after);
-    additions += delta.additions;
-    deletions += delta.deletions;
-  }
-
-  const context = typeof args.context === 'string' && args.context.trim() ? args.context.trim() : null;
-
-  const result = await getLLMProvider().analyzePR({
-    prMeta: {
-      title: context ?? 'mcp-session',
-      author: 'mcp-session',
-      filesChanged: changes.length,
-      additions,
-      deletions,
-    },
-    structuralDiff,
-  });
-
-  return { result, filesReviewed: changes.length };
-}
-
 /** Dispatch a single JSON-RPC request to the matching MCP method. */
 async function handleRpc(rpc: JsonRpcRequest): Promise<NextResponse> {
   const id = rpc.id ?? null;
@@ -336,7 +211,7 @@ async function handleRpc(rpc: JsonRpcRequest): Promise<NextResponse> {
       try {
         const { result, filesReviewed } = await runAnalysis(args);
         return rpcResult(id, {
-          content: [{ type: 'text', text: formatToolText(result, filesReviewed) }],
+          content: [{ type: 'text', text: formatShippingBrief(result, filesReviewed) }],
           structuredContent: {
             summary: result.summary,
             riskLevel: result.riskLevel,

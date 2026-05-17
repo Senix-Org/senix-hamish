@@ -1,88 +1,68 @@
-You are working on Senix, an MCP server that reviews code changes. Step 1 
-(shipping brief output and tool rename) is already done and deployed.
+You are working on Senix, an MCP server that reviews code changes. Steps 1 
+(shipping brief output and tool rename) and 2 (dashboard onboarding flow) 
+are already done and deployed.
 
 WRITING STYLE RULES
 Do not use em-dashes or en-dashes. Use commas, periods, or parentheses 
-instead. Write complete sentences with normal punctuation. Do not use 
-bullet lists with dashes in UI text. Use plain numbered steps. Keep all 
-UI copy clear and direct.
+instead. Write complete sentences with normal punctuation. For docs, use 
+plain numbered lists, not bullets with dashes. Keep prose clear and direct.
 
 CONTEXT YOU NEED
-The mcp_tokens table already exists in Supabase with these columns: id 
-(uuid), user_id (uuid), name (text), token_hash (text), last_used_at 
-(timestamp with time zone), created_at (timestamp with time zone). Do 
-not create or migrate this table. Use it as is.
+
+The review_changes tool expects this argument shape:
+{
+  "changes": [
+    {
+      "file_path": "string",
+      "language": "string (optional)",
+      "before": "string (file content before, empty for new files)",
+      "after": "string (file content after, empty for deletions)"
+    }
+  ],
+  "context": "string (optional)"
+}
+
+The playground will accept a unified diff string from users. You need to 
+parse the diff into the changes array shape before calling the tool. Use 
+an existing library if available, do not write a diff parser from scratch.
+Recommended: parse-diff (https://www.npmjs.com/package/parse-diff) is small 
+and well-tested. Install it as a dependency.
+
+The token storage pattern from step 2 lives in src/lib/mcp-tokens.ts. 
+Follow the same pattern for new server helpers: put shared logic in 
+src/lib/, route handlers stay thin.
 
 YOUR TASK
-This is step 2 of 3. You are building the dashboard onboarding flow that 
-lets a user pick their IDE, name and generate a token, copy a config 
-snippet, and know they are set up.
+This is step 3 of 3. You are adding troubleshooting docs and building a 
+public web playground where someone can paste a git diff and get a shipping 
+brief without signing up.
 
-WHAT TO BUILD
+PART A: DOCS
 
-1. Add a new dashboard page at /dashboard/connect. Title: "Connect your IDE". 
-   Subtitle: "Pick your IDE. Copy the config. Restart. You are done."
+1. Create or update docs/troubleshooting.md. Top-level heading: 
+   "Troubleshooting Senix MCP". Add these sections in order:
 
-2. Below the subtitle, show four IDE cards in a 2x2 grid on desktop, 
-   stacked on mobile. Each card has the IDE logo (use a simple SVG or 
-   text if no logo asset exists), the IDE name, and a "Select" button. 
-   The four IDEs are: Cursor, Antigravity, Claude Code, Windsurf.
+   Section: "Verify your connection"
+   Body: Tell the user to type this prompt into their IDE chat:
+   
+       List the tools from the Senix MCP server only.
+   
+   Expected output: the IDE should list exactly one tool, "review_changes". 
+   If the IDE lists more tools or different tools, the user is connected 
+   to a different MCP server. Check the server name in the config.
 
-3. When the user clicks "Select" on an IDE, the page transitions to the 
-   setup view for that IDE. Use client-side state, no route change needed. 
-   The setup view shows three steps stacked vertically.
+   Section: "Test a real review"
+   Body: Tell the user to type:
+   
+       Use Senix to review my current uncommitted changes.
+   
+   Expected behavior: the IDE calls Senix and returns a shipping brief 
+   within about 30 seconds. If nothing happens, the IDE did not route to 
+   Senix. Check the troubleshooting list below.
 
-   Step 1 box: "Name and generate your token"
-   Inside: a text input labeled "Token name" with placeholder text like 
-   "My Cursor setup" or "Laptop". Below that, a button labeled "Generate 
-   token". When clicked, it calls a new API endpoint POST /api/mcp/token 
-   that takes the name in the request body, creates a token tied to the 
-   logged-in user, stores the name and hashed token in mcp_tokens, and 
-   returns the plain token in the response. If the name field is empty, 
-   default to "IDE on [today's date]" in the format "IDE on Nov 16, 2026". 
-   The token should look like sk_mcp_xxxxxxxxxxxxxxxx (matching the 
-   existing format). Show the token in a read-only input field with a 
-   copy button next to it. Show the plain token to the user exactly once 
-   on creation. After they navigate away, the token can never be shown 
-   again, only revoked.
-
-   Step 2 box: "Copy your config"
-   Inside: show the config snippet for the selected IDE. Each IDE has 
-   its own snippet format. Substitute the actual token into the snippet. 
-   Include a "Copy" button.
-
-   Cursor config (file location: ~/.cursor/mcp.json on macOS or Linux, 
-   %APPDATA%\Cursor\mcp.json on Windows):
-   {
-     "mcpServers": {
-       "senix": {
-         "url": "https://senix-chi.vercel.app/api/mcp",
-         "headers": {
-           "Authorization": "Bearer YOUR_TOKEN_HERE"
-         }
-       }
-     }
-   }
-
-   Claude Code config (file location: ~/.config/claude/mcp_servers.json):
-   Same JSON structure as Cursor.
-
-   Windsurf config (file location: ~/.codeium/windsurf/mcp_config.json):
-   Same JSON structure.
-
-   Antigravity config (file location varies, link to their docs):
-   Same JSON structure.
-
-   Below each snippet, show the file location in a small monospace label 
-   so the user knows where to paste it.
-
-   Step 3 box: "Restart your IDE and test"
-   Inside: plain instructions. "Quit and reopen your IDE. Then type in 
-   chat: 'Use Senix to review my changes.' If Senix runs, you are connected."
-
-4. Add a small "Need help?" link at the bottom of the page that scrolls 
-   to a troubleshooting section with these common mistakes as a plain 
-   numbered list (not bullets):
+   Section: "Common setup mistakes"
+   Body: A plain numbered list (no dashes) with these 5 items, keeping 
+   the wording consistent with the dashboard troubleshooting block:
    1. Token pasted without "Bearer " in front of it.
    2. Wrong server name. The server must be called "senix" in the config.
    3. IDE was not fully quit and reopened. Some IDEs need a full restart.
@@ -90,30 +70,91 @@ WHAT TO BUILD
       being called instead.
    5. Token was revoked or copied wrong. Generate a new one.
 
-5. Add a "Manage tokens" section under the user's main dashboard (not on 
-   /connect, on the main /dashboard page). Show a list of existing tokens 
-   for the logged-in user with these columns: name, created_at (formatted 
-   as "Created Nov 15, 2026"), last_used_at (formatted as relative time, 
-   see point 6), and a "Revoke" button for each row. Revoking deletes the 
-   row from mcp_tokens. If the user has no tokens, show an empty state: 
-   "You have no MCP tokens yet. Go to Connect your IDE to create one."
+   Section: "Still stuck?"
+   Body: One sentence telling them to email support at the project email 
+   address (use a placeholder like support@senix.example if no real 
+   address exists yet).
 
-6. Add a "last seen" indicator. When the MCP server receives any request 
-   with a valid token, update mcp_tokens.last_used_at to the current 
-   timestamp. On the dashboard token list, format last_used_at as relative 
-   time: "Used 5 minutes ago", "Used 2 hours ago", "Used 3 days ago". If 
-   last_used_at is null or has never been set, show "Not yet connected" 
-   in a muted color.
+2. On the /dashboard/connect page, update the "Need help?" link added in 
+   step 2 to point to the new docs page (/docs/troubleshooting or 
+   wherever Next.js renders the markdown file). Keep the inline 
+   troubleshooting section as a fallback below the link.
+
+PART B: WEB PLAYGROUND
+
+3. Add a new public page at /playground. No auth required.
+
+   Title: "Try Senix on a real diff"
+   Subtitle: "Paste a git diff. Get a shipping brief. No signup."
+
+   The page has two columns on desktop, stacked on mobile.
+
+   Left column: a large textarea labeled "Paste your diff here", monospace 
+   font, at least 20 rows tall. Below it, a "Review with Senix" button.
+
+   Right column: empty placeholder until the user submits. After submit, 
+   show a loading state ("Reviewing your changes, this takes about 20 
+   seconds"), then render the shipping brief output using the same text 
+   format the MCP tool returns.
+
+4. The submit button calls a new API endpoint POST /api/playground/review.
+   The endpoint:
+   
+   a. Accepts a JSON body with a single field "diff" containing the 
+      unified diff string.
+   b. Parses the diff into the changes array shape using parse-diff. 
+      For each file in the parsed diff, set file_path from the diff 
+      header. If parse-diff exposes language detection use it, otherwise 
+      infer language from the file extension (.js to javascript, .ts to 
+      typescript, .tsx to tsx, .py to python). For new files (no "before" 
+      content), set before to empty string. For deletions, set after to 
+      empty string. For modifications, reconstruct before and after by 
+      applying the diff hunks in reverse and forward respectively.
+   c. Calls the same internal handler the review_changes MCP tool uses. 
+      Do not call the MCP endpoint over HTTP, that would be wasteful. 
+      Extract the analysis logic into a shared helper if it is not 
+      already in src/lib/.
+   d. Returns the analysis result as JSON, same shape the MCP tool 
+      returns (text + structuredContent).
+   
+5. Rate limit /api/playground/review aggressively. Limit by IP address: 
+   5 requests per IP per hour. The serverless environment means in-memory 
+   counters do not work across cold starts. Use Supabase for the 
+   counter. Create a new table playground_rate_limits with columns: 
+   id (uuid), ip_hash (text), window_start (timestamp with time zone), 
+   count (integer). Hash the IP address with sha256 before storing, do 
+   not store raw IPs. The window is the current hour. On each request:
+   1. Hash the IP.
+   2. Look up or create a row for this ip_hash and current hour.
+   3. If count >= 5, return 429 with this body:
+      { "error": "Playground limit reached. Sign up for unlimited reviews." }
+   4. Otherwise increment count and process the request.
+   
+   Use an atomic Supabase upsert with an increment expression so two 
+   concurrent requests cannot both pass when the limit is at 4.
+
+6. Also limit diff size: reject diffs larger than 50 KB before calling 
+   the tool. Return 413 with this body:
+   { "error": "Diff is too large for the playground. Sign up to review larger changes." }
+
+7. Below the playground output area, after a successful review, show a 
+   banner: "Like what you see? Connect Senix to your IDE for unlimited 
+   reviews." with a button linking to /dashboard/connect if logged in, 
+   /login if not. Detect login state with the existing session helpers.
+
+8. Add /playground to the public landing page. Add a CTA button to the 
+   hero section labeled "Try the playground". Style it as a tertiary 
+   button (text link with an arrow icon, no background fill) so it does 
+   not compete with the primary CTAs.
 
 WHAT NOT TO CHANGE
-Do not modify the MCP tool itself in this step. The shipping brief work 
-is done. Do not touch the public landing page in this step. Do not modify 
-the existing token authentication logic, only add the UI and the name 
-field handling on token creation.
+Do not touch the MCP tool itself or the dashboard onboarding flow. Do 
+not change billing, pricing, or existing auth logic. Do not add the 
+"create table" SQL inline in code, use a Supabase migration file in the 
+standard migrations location.
 
 WHEN DONE
-Tell me which files you created or changed. Take a screenshot of the 
-/dashboard/connect page in its initial state (the 2x2 IDE grid) and 
-after selecting Cursor (the three-step setup view) so I can verify the 
-layout. Also take a screenshot of the Manage tokens section showing at 
-least one existing token.
+Tell me which files you changed or created. Confirm the rate limit works 
+by describing the test you ran (6 sequential requests from the same IP, 
+the 6th should return 429). If you cannot test it without a deployed 
+environment, say so honestly.

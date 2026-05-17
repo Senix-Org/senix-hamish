@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import {
+  ArrowRight,
   GitBranch,
   GitPullRequest,
   MessageSquareCode,
@@ -144,6 +145,16 @@ function Hero(): React.ReactElement {
               className="inline-flex items-center justify-center px-5 py-3 rounded-md border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50 text-zinc-200 font-medium text-sm transition"
             >
               See how it works
+            </Link>
+            <Link
+              href="/playground"
+              className="group inline-flex items-center justify-center gap-1.5 px-5 py-3 text-sm font-medium text-zinc-400 hover:text-green-400 transition"
+            >
+              Try the playground
+              <ArrowRight
+                size={15}
+                className="transition-transform group-hover:translate-x-0.5"
+              />
             </Link>
           </div>
         </Reveal>

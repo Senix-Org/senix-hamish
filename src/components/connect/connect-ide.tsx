@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import {
   ArrowLeft,
   ArrowRight,
@@ -107,12 +108,12 @@ export function ConnectIde(): React.ReactElement {
       )}
 
       <div className="border-t border-zinc-800/70 pt-6">
-        <a
-          href="#senix-troubleshooting"
+        <Link
+          href="/docs/troubleshooting"
           className="text-sm text-zinc-400 hover:text-green-400 transition-colors"
         >
           Need help?
-        </a>
+        </Link>
       </div>
 
       <Troubleshooting />
