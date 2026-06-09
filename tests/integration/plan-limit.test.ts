@@ -59,7 +59,8 @@ describe('handlePullRequest at plan limit', () => {
     expect(enqueue).not.toHaveBeenCalled();
     expect(upsertPRComment).toHaveBeenCalledOnce();
     const body = upsertPRComment.mock.calls[0][0].commentBody as string;
-    expect(body).toMatch(/limit reached/i);
+    expect(body).toMatch(/reached your Senix review limit/i);
+    expect(body).toMatch(/dashboard\/billing/);
   });
 
   it('proceeds to dispatch when under the limit', async () => {

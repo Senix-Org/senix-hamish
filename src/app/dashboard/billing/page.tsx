@@ -83,5 +83,14 @@ export default async function BillingPage(): Promise<React.ReactElement> {
     reviewsResetAt: userPlan.reviewsResetAt,
   };
 
-  return <BillingClient planData={planData} tiers={TIERS} analyses={usage.analyses} />;
+  // Tokens consumed in the current billing cycle (since the quota reset).
+  const cycleStartMs = new Date(userPlan.reviewsResetAt).getTime();
+  const tokensThisCycle = usage.analyses
+    .filter((a) => {
+      const ts = new Date(a.createdAt).getTime();
+      return Number.isNaN(cycleStartMs) || ts >= cycleStartMs;
+    })
+    .reduce((sum, a) => sum + a.tokensUsed, 0);
+
+  return <BillingClient planData={planData} tiers={TIERS} tokensThisCycle={tokensThisCycle} />;
 }

@@ -15,7 +15,7 @@ import { findRepository } from './lookup';
  * All other actions are ignored. Closed/merged PRs don't need analysis.
  */
 const ACTIONS_WE_HANDLE = new Set(['opened', 'synchronize', 'reopened']);
-const LIMIT_REACHED_COMMENT = `Senix monthly review limit reached. Upgrade at ${getAppBaseUrl()}/dashboard to continue reviewing PRs.`;
+const LIMIT_REACHED_COMMENT = `You've reached your Senix review limit for this month. Upgrade at ${getAppBaseUrl()}/dashboard/billing`;
 
 type RepositoryRow = {
   id: string;

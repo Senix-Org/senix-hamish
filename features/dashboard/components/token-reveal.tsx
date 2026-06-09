@@ -15,7 +15,17 @@ const REVEAL_WINDOW_SECONDS = 60;
  * revoked + regenerated), so the recovery window does not weaken the
  * "shown once" guarantee.
  */
-export function TokenReveal({ token }: { token: string }): React.ReactElement {
+export function TokenReveal({
+  token,
+  onCopied,
+  onExpired,
+}: {
+  token: string;
+  /** Fired the first time the token is successfully copied. */
+  onCopied?: () => void;
+  /** Fired when the 60-second reveal window expires. */
+  onExpired?: () => void;
+}): React.ReactElement {
   const [visible, setVisible] = useState(true);
   const [secondsLeft, setSecondsLeft] = useState(REVEAL_WINDOW_SECONDS);
   const [expired, setExpired] = useState(false);
@@ -32,19 +42,21 @@ export function TokenReveal({ token }: { token: string }): React.ReactElement {
           secretRef.current = null;
           setExpired(true);
           setVisible(false);
+          onExpired?.();
           return 0;
         }
         return s - 1;
       });
     }, 1000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [onExpired]);
 
   async function onCopy(): Promise<void> {
     if (!secretRef.current) return;
     try {
       await navigator.clipboard.writeText(secretRef.current);
       setCopied(true);
+      onCopied?.();
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard can be blocked; reveal so the user can select manually.

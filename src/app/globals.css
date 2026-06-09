@@ -230,3 +230,13 @@ body {
   scrollbar-width: thin;
   scrollbar-color: var(--color-surface-border) var(--color-surface-raised);
 }
+
+/* Fully hidden scrollbar that still scrolls (e.g. token lists). */
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge/IE */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
+}

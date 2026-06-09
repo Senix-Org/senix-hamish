@@ -1,9 +1,13 @@
-import { GitPullRequest, Plus, AlertTriangle } from 'lucide-react';
+import Link from 'next/link';
+import { GitPullRequest, Plus, AlertTriangle, Ban } from 'lucide-react';
 import { createServerSupabaseClient } from '@features/shared/supabase-server';
 import { RecentAnalyses } from '@features/dashboard/components/recent-analyses';
+import { RealtimeReviews } from '@features/dashboard/components/realtime-reviews';
 import type { AnalysisCardData } from '@features/dashboard/components/analysis-card';
 import RepoToggle from '@features/dashboard/components/repo-toggle';
 import { getGithubAppInstallUrl } from '@features/github-integration/install-url';
+import { currentAppUserId } from '@features/auth/mcp-tokens';
+import { getUserPlan } from '@features/billing/plan-limits';
 
 /**
  * Deterministic accent dot per repo so the list reads at a glance without
@@ -76,6 +80,26 @@ export default async function DashboardPage({
   const analyses = (analysesResult.data ?? []) as unknown as AnalysisRow[];
   const repos = (reposResult.data ?? []) as unknown as RepoRow[];
 
+  // Plan usage for the limit banner. Non-fatal: if the plan can't be read
+  // (e.g. brand-new account before its users row settles) we just skip it.
+  let usage: { used: number; limit: number; percent: number } | null = null;
+  try {
+    const userId = await currentAppUserId();
+    if (userId) {
+      const plan = await getUserPlan(userId);
+      const limit = plan.effectiveLimit.reviews;
+      if (limit > 0) {
+        usage = {
+          used: plan.reviewsUsed,
+          limit,
+          percent: Math.min(100, Math.round((plan.reviewsUsed / limit) * 100)),
+        };
+      }
+    }
+  } catch {
+    usage = null;
+  }
+
   const enabledRepoCount = repos.filter((r) => r.enabled).length;
   // Server Component: rendered once per request, so reading the clock here
   // is deterministic for this render. Hoisted out of the filter for clarity.
@@ -88,6 +112,7 @@ export default async function DashboardPage({
     id: a.id,
     summary: a.summary,
     risk_level: a.risk_level,
+    status: a.status,
     created_at: a.created_at,
     github_comment_url: a.github_comment_url,
     pr_title: a.pull_requests?.title ?? '(untitled PR)',
@@ -105,6 +130,8 @@ export default async function DashboardPage({
           week
         </p>
       </header>
+
+      {usage && usage.percent >= 80 && <UsageLimitBanner usage={usage} />}
 
       {setupIncomplete && (
         <div className="mt-6 flex items-center gap-3 rounded-xl border border-risk-medium/30 bg-risk-medium/10 px-4 py-3 text-sm text-primary">
@@ -160,6 +187,39 @@ export default async function DashboardPage({
         <h2 className="mb-4 text-lg font-semibold text-primary">Recent analyses</h2>
         {analyses.length === 0 ? <AnalysesEmptyState /> : <RecentAnalyses analyses={analysisCards} />}
       </section>
+
+      <RealtimeReviews />
+    </div>
+  );
+}
+
+function UsageLimitBanner({
+  usage,
+}: {
+  usage: { used: number; limit: number; percent: number };
+}): React.ReactElement {
+  const blocked = usage.percent >= 100;
+  return (
+    <div
+      className={`mt-6 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm ${
+        blocked
+          ? 'border-risk-high/40 bg-risk-high/10 text-primary'
+          : 'border-risk-medium/30 bg-risk-medium/10 text-primary'
+      }`}
+    >
+      {blocked ? (
+        <Ban size={16} className="shrink-0 text-risk-high" />
+      ) : (
+        <AlertTriangle size={16} className="shrink-0 text-risk-medium" />
+      )}
+      <span className="flex-1">
+        {blocked
+          ? `You've reached your monthly review limit (${usage.used} of ${usage.limit}). New pull requests won't be reviewed until your quota resets or you upgrade.`
+          : `You've used ${usage.percent}% of your monthly reviews (${usage.used} of ${usage.limit}).`}
+      </span>
+      <Link href="/dashboard/billing" className="btn-senix btn-senix-secondary shrink-0">
+        Upgrade
+      </Link>
     </div>
   );
 }

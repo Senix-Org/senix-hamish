@@ -323,7 +323,7 @@ async function handleRpc(rpc: JsonRpcRequest, token: McpTokenRow): Promise<RpcOu
           return rpcError(
             id,
             MONTHLY_LIMIT_REACHED,
-            `Monthly review limit reached. Upgrade your plan at ${getAppBaseUrl()}/dashboard`
+            `You've reached your Senix review limit for this month. Upgrade at ${getAppBaseUrl()}/dashboard/billing to continue reviewing changes.`
           );
         }
 

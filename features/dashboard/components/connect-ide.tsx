@@ -512,7 +512,13 @@ function ConfigBlock({ config }: { config: string }): React.ReactElement {
   );
 }
 
-type TestState = 'idle' | 'testing' | 'connected' | 'failed';
+type TestState = 'idle' | 'testing' | 'connected' | 'pending' | 'invalid';
+
+type TestResponse = {
+  status?: 'connected' | 'token_valid' | 'invalid';
+  error?: string;
+  message?: string;
+};
 
 function TestStep({ token }: { token: string | null }): React.ReactElement {
   const [state, setState] = useState<TestState>('idle');
@@ -524,15 +530,18 @@ function TestStep({ token }: { token: string | null }): React.ReactElement {
     setMessage(null);
     try {
       const res = await fetch(`/api/mcp/test?token=${encodeURIComponent(token)}`);
-      const data = (await res.json()) as { connected?: boolean; error?: string };
-      if (res.ok && data.connected) {
+      const data = (await res.json()) as TestResponse;
+      if (data.status === 'connected') {
         setState('connected');
+      } else if (data.status === 'token_valid') {
+        setState('pending');
+        setMessage(data.message ?? 'Token valid, but no IDE has connected yet.');
       } else {
-        setState('failed');
-        setMessage(data.error ?? 'Not connected yet.');
+        setState('invalid');
+        setMessage(data.error ?? 'Invalid token.');
       }
     } catch {
-      setState('failed');
+      setState('invalid');
       setMessage('Could not reach Senix. Check your connection and try again.');
     }
   }
@@ -570,16 +579,21 @@ function TestStep({ token }: { token: string | null }): React.ReactElement {
             Connected
           </span>
         )}
-        {state === 'failed' && (
+        {state === 'pending' && (
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-risk-medium/30 bg-risk-medium/10 px-3 py-1.5 text-sm font-medium text-risk-medium">
+            <TriangleAlert size={15} />
+            Token valid but IDE not connected yet
+          </span>
+        )}
+        {state === 'invalid' && (
           <span className="inline-flex items-center gap-1.5 rounded-lg border border-risk-high/30 bg-risk-high/10 px-3 py-1.5 text-sm font-medium text-risk-high">
             <TriangleAlert size={15} />
-            Not connected yet
+            Invalid token
           </span>
         )}
       </div>
-      {state === 'failed' && message && <p className="mt-2 text-xs text-muted">{message}</p>}
-      {!token && (
-        <p className="mt-2 text-xs text-muted">Generate a token in step 1 to enable the test.</p>
+      {(state === 'pending' || state === 'invalid') && message && (
+        <p className="mt-2 text-xs text-muted">{message}</p>
       )}
     </StepBox>
   );
