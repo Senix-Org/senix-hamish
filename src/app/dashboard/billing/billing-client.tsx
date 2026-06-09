@@ -39,6 +39,24 @@ type Props = {
 
 const PLAN_ORDER: BillingPlanName[] = ['free', 'starter', 'team', 'pro'];
 
+type BillingPeriod = 'monthly' | 'yearly';
+
+/**
+ * Per-plan pricing. `monthly` is the standard monthly price; `yearlyMonthly`
+ * is the discounted per-month price when billed annually (~20% off), and
+ * `yearlyTotal` is the upfront annual charge. Free stays at zero.
+ */
+const PLAN_PRICING: Record<BillingPlanName, {
+  monthly: number;
+  yearlyMonthly: number;
+  yearlyTotal: number;
+}> = {
+  free: { monthly: 0, yearlyMonthly: 0, yearlyTotal: 0 },
+  starter: { monthly: 18, yearlyMonthly: 14, yearlyTotal: 168 },
+  team: { monthly: 79, yearlyMonthly: 63, yearlyTotal: 756 },
+  pro: { monthly: 199, yearlyMonthly: 159, yearlyTotal: 1908 },
+};
+
 /**
  * Billing overview. Three sections, top to bottom: the current plan with a
  * usage bar and quota reset, a row of usage stat cards for the cycle, and a
@@ -52,6 +70,8 @@ export function BillingClient({ planData, tiers, tokensThisCycle }: Props): Reac
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Plan-comparison billing period. UI-only state, defaults to monthly.
+  const [period, setPeriod] = useState<BillingPeriod>('monthly');
 
   const currentTier = tiers.find((tier) => tier.plan === currentPlanData.plan) ?? tiers[0];
   const nextTier = getNextTier(currentPlanData.plan, tiers);
@@ -73,7 +93,7 @@ export function BillingClient({ planData, tiers, tokensThisCycle }: Props): Reac
       const response = await fetch('/api/billing/checkout', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, period }),
       });
 
       if (response.status === 401) {
@@ -228,12 +248,16 @@ export function BillingClient({ planData, tiers, tokensThisCycle }: Props): Reac
 
       {/* Plan comparison */}
       <section className="mt-8">
-        <h2 className="text-lg font-semibold text-primary">Compare plans</h2>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-semibold text-primary">Compare plans</h2>
+          <PeriodToggle period={period} onChange={setPeriod} />
+        </div>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {tiers.map((tier) => (
             <PlanCard
               key={tier.plan}
               tier={tier}
+              period={period}
               currentPlan={currentPlanData.plan}
               busy={checkoutBusy === tier.plan}
               disabled={checkoutBusy !== null}
@@ -321,14 +345,53 @@ function StatCard({
   );
 }
 
+function PeriodToggle({
+  period,
+  onChange,
+}: {
+  period: BillingPeriod;
+  onChange: (next: BillingPeriod) => void;
+}): React.ReactElement {
+  const options: Array<{ key: BillingPeriod; label: string }> = [
+    { key: 'monthly', label: 'Monthly' },
+    { key: 'yearly', label: 'Yearly' },
+  ];
+  return (
+    <div className="inline-flex items-center gap-1 self-start rounded-full border border-surface-border bg-surface p-1 text-sm">
+      {options.map((o) => {
+        const active = period === o.key;
+        return (
+          <button
+            key={o.key}
+            type="button"
+            onClick={() => onChange(o.key)}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors ${
+              active ? 'bg-surface-raised text-primary' : 'text-secondary hover:text-primary'
+            }`}
+          >
+            {o.label}
+            {o.key === 'yearly' && (
+              <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-medium text-accent">
+                -20%
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function PlanCard({
   tier,
+  period,
   currentPlan,
   busy,
   disabled,
   onUpgrade,
 }: {
   tier: BillingTier;
+  period: BillingPeriod;
   currentPlan: BillingPlanName;
   busy: boolean;
   disabled: boolean;
@@ -338,6 +401,14 @@ function PlanCard({
   const tierIndex = PLAN_ORDER.indexOf(tier.plan);
   const currentIndex = PLAN_ORDER.indexOf(currentPlan);
   const isUpgrade = tierIndex > currentIndex;
+
+  const pricing = PLAN_PRICING[tier.plan];
+  const yearly = period === 'yearly';
+  const paid = pricing.monthly > 0;
+  const displayMonthly = yearly ? pricing.yearlyMonthly : pricing.monthly;
+  const savePercent = paid
+    ? Math.round((1 - pricing.yearlyMonthly / pricing.monthly) * 100)
+    : 0;
 
   const features = [
     `${tier.reviews.toLocaleString()} reviews / month`,
@@ -353,14 +424,34 @@ function PlanCard({
     >
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-primary">{tier.label}</span>
-        {isCurrent && <span className="text-xs font-medium text-accent">Current</span>}
-      </div>
-      <div className="mt-2 flex items-baseline gap-1">
-        <span className="text-2xl font-semibold text-primary">{tier.price}</span>
-        <span className="text-xs text-muted">/mo</span>
+        {isCurrent ? (
+          <span className="text-xs font-medium text-accent">Current</span>
+        ) : (
+          yearly &&
+          paid && (
+            <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium text-accent">
+              Save {savePercent}%
+            </span>
+          )
+        )}
       </div>
 
-      <ul className="mt-4 flex-1 space-y-2">
+      <div className="mt-2 flex items-baseline gap-1">
+        <span className="text-3xl font-semibold text-primary">${displayMonthly}</span>
+        <span className="text-xs text-muted">/mo</span>
+      </div>
+      <div className="mt-1 min-h-[1.25rem] text-xs text-muted">
+        {yearly && paid ? (
+          <span>
+            billed annually (${pricing.yearlyTotal.toLocaleString()}/yr) ·{' '}
+            <span className="text-secondary line-through">${pricing.monthly}/mo</span>
+          </span>
+        ) : null}
+      </div>
+
+      <div className="my-4 border-t border-surface-border" />
+
+      <ul className="flex-1 space-y-2">
         {features.map((f) => (
           <li key={f} className="flex items-start gap-2 text-xs text-secondary">
             <Check size={14} className="mt-0.5 shrink-0 text-accent" />

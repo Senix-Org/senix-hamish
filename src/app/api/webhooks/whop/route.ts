@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@features/shared/supabase';
-import { planForWhopProductId, verifyWhopSignature } from '@features/billing/whop';
+import { planForWhopPlanId, planForWhopProductId, verifyWhopSignature } from '@features/billing/whop';
 import type { PlanName, PlanStatus } from '@features/billing/plan-limits';
 
 export const runtime = 'nodejs';
@@ -70,13 +70,17 @@ export async function GET(): Promise<NextResponse> {
 async function handleMembershipActivated(payload: unknown): Promise<void> {
   const email = extractEmail(payload);
   const productId = extractProductId(payload);
+  const planId = extractPlanId(payload);
   const membershipId = extractMembershipId(payload);
   const eventId = extractEventId(payload);
-  const plan = planForWhopProductId(productId);
+  // Prefer mapping by the specific plan ID (per period); fall back to the
+  // product ID for older configurations.
+  const plan = planForWhopPlanId(planId) ?? planForWhopProductId(productId);
 
   console.log('[whop webhook] membership_activated', {
     email,
     productId,
+    planId,
     plan,
     membershipId,
   });
@@ -291,6 +295,20 @@ function extractProductId(payload: unknown): string | null {
     readString(payload, ['data', 'membership', 'product', 'id']) ??
     readString(payload, ['data', 'object', 'product_id']) ??
     readString(payload, ['data', 'object', 'product', 'id']) ??
+    null
+  );
+}
+
+function extractPlanId(payload: unknown): string | null {
+  return (
+    readString(payload, ['plan_id']) ??
+    readString(payload, ['plan', 'id']) ??
+    readString(payload, ['data', 'plan_id']) ??
+    readString(payload, ['data', 'plan', 'id']) ??
+    readString(payload, ['data', 'membership', 'plan_id']) ??
+    readString(payload, ['data', 'membership', 'plan', 'id']) ??
+    readString(payload, ['data', 'object', 'plan_id']) ??
+    readString(payload, ['data', 'object', 'plan', 'id']) ??
     null
   );
 }

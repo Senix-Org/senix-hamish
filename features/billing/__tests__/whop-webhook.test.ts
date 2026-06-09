@@ -8,9 +8,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * not revoke paid capacity.
  */
 
-const { verifyWhopSignature, planForWhopProductId } = vi.hoisted(() => ({
+const { verifyWhopSignature, planForWhopProductId, planForWhopPlanId } = vi.hoisted(() => ({
   verifyWhopSignature: vi.fn(() => true),
   planForWhopProductId: vi.fn(() => 'starter'),
+  planForWhopPlanId: vi.fn(() => null),
 }));
 
 const updates: Array<Record<string, unknown>> = [];
@@ -18,7 +19,11 @@ const currentUser = {
   id: 'u1', email: 'u@e.com', plan: 'free', plan_status: 'active', whop_membership_id: 'm1',
 };
 
-vi.mock('@features/billing/whop', () => ({ verifyWhopSignature, planForWhopProductId }));
+vi.mock('@features/billing/whop', () => ({
+  verifyWhopSignature,
+  planForWhopProductId,
+  planForWhopPlanId,
+}));
 vi.mock('@features/shared/supabase', () => ({
   supabaseAdmin: {
     from: () => ({
@@ -45,6 +50,7 @@ beforeEach(() => {
   updates.length = 0;
   verifyWhopSignature.mockReturnValue(true);
   planForWhopProductId.mockReturnValue('starter');
+  planForWhopPlanId.mockReturnValue(null);
 });
 
 describe('Whop webhook', () => {

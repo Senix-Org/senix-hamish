@@ -11,6 +11,42 @@ const PAID_PLAN_DETAILS: Record<PaidPlanName, { label: string; monthlyPrice: num
   pro: { label: 'Pro', monthlyPrice: 199 },
 };
 
+export type BillingPeriod = 'monthly' | 'yearly';
+
+/**
+ * Map each paid plan + billing period to the env var holding its Whop plan
+ * ID (`plan_…`). These are pre-created Whop plans with their own hosted
+ * checkout pages, so no plan needs to be created at runtime.
+ */
+const PLAN_ID_ENV_VARS: Record<PaidPlanName, Record<BillingPeriod, string>> = {
+  starter: { monthly: 'WHOP_STARTER_MONTHLY_ID', yearly: 'WHOP_STARTER_YEARLY_ID' },
+  team: { monthly: 'WHOP_TEAM_MONTHLY_ID', yearly: 'WHOP_TEAM_YEARLY_ID' },
+  pro: { monthly: 'WHOP_PRO_MONTHLY_ID', yearly: 'WHOP_PRO_YEARLY_ID' },
+};
+
+/** Resolve the configured Whop plan ID for a plan + period, if any. */
+export function whopPlanId(plan: PaidPlanName, period: BillingPeriod): string | null {
+  return process.env[PLAN_ID_ENV_VARS[plan][period]]?.trim() || null;
+}
+
+/** Reverse lookup: which paid plan does a given Whop plan ID belong to. */
+export function planForWhopPlanId(planId: string | null | undefined): PaidPlanName | null {
+  if (!planId) return null;
+  for (const plan of Object.keys(PLAN_ID_ENV_VARS) as PaidPlanName[]) {
+    for (const period of ['monthly', 'yearly'] as BillingPeriod[]) {
+      if (process.env[PLAN_ID_ENV_VARS[plan][period]]?.trim() === planId) {
+        return plan;
+      }
+    }
+  }
+  return null;
+}
+
+/** Hosted Whop checkout URL for a pre-created plan ID. */
+export function whopCheckoutUrlForPlanId(planId: string): string {
+  return `https://whop.com/checkout/${encodeURIComponent(planId)}`;
+}
+
 export function whopProductIdForPlan(plan: PaidPlanName): string | null {
   switch (plan) {
     case 'starter':

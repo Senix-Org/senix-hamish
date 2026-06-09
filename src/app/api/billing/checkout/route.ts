@@ -1,12 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@features/shared/supabase-server';
-import { createWhopCheckoutLink, whopProductIdForPlan } from '@features/billing/whop';
-import type { PaidPlanName } from '@features/billing/whop';
+import {
+  createWhopCheckoutLink,
+  whopCheckoutUrlForPlanId,
+  whopPlanId,
+  whopProductIdForPlan,
+} from '@features/billing/whop';
+import type { BillingPeriod, PaidPlanName } from '@features/billing/whop';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const PAID_PLANS = new Set<PaidPlanName>(['starter', 'team', 'pro']);
+
+function parsePeriod(body: unknown): BillingPeriod {
+  const raw =
+    body && typeof body === 'object' ? (body as Record<string, unknown>).period : undefined;
+  return raw === 'yearly' ? 'yearly' : 'monthly';
+}
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const supabase = await createServerSupabaseClient();
@@ -35,9 +46,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unknown billing plan.' }, { status: 400 });
   }
 
+  const period = parsePeriod(body);
+
+  // Preferred path: a pre-created Whop plan ID with a hosted checkout page.
+  const planId = whopPlanId(plan as PaidPlanName, period);
+  if (planId) {
+    return NextResponse.json({ checkoutUrl: whopCheckoutUrlForPlanId(planId) });
+  }
+
+  // Fallback: build a plan dynamically from the configured product ID
+  // (monthly pricing only) for environments without direct plan IDs.
   const productId = whopProductIdForPlan(plan as PaidPlanName);
   if (!productId) {
-    return NextResponse.json({ error: 'Whop product is not configured.' }, { status: 500 });
+    return NextResponse.json({ error: 'Whop plan is not configured.' }, { status: 500 });
   }
 
   try {
