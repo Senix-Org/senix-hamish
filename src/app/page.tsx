@@ -109,7 +109,7 @@ export default async function HomePage({
 function Hero(): React.ReactElement {
   return (
     <section className="relative overflow-hidden border-b border-zinc-800/40">
-      <div aria-hidden className="absolute inset-0 bg-grid opacity-60 pointer-events-none" />
+      <div aria-hidden className="absolute inset-0 bg-hero-dots pointer-events-none" />
       <div
         aria-hidden
         className="absolute -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-glow-green pointer-events-none"

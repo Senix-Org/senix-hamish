@@ -26,6 +26,20 @@ const COLUMNS: FooterColumn[] = [
       { label: 'Playground', href: '/playground' },
     ],
   },
+  {
+    heading: 'Company',
+    links: [
+      { label: 'About', href: '/about' },
+      { label: 'Blog', href: '/blog' },
+    ],
+  },
+  {
+    heading: 'Legal',
+    links: [
+      { label: 'Privacy', href: '/privacy' },
+      { label: 'Terms', href: '/terms' },
+    ],
+  },
 ];
 
 /**
@@ -36,8 +50,8 @@ export function SiteFooter(): React.ReactElement {
   return (
     <footer className="border-t border-zinc-800/60 mt-24">
       <div className="max-w-6xl mx-auto px-5 sm:px-6 py-14">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-10">
-          <div className="col-span-2">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-10">
+          <div className="col-span-2 md:col-span-1">
             <Link href="/" className="flex items-center gap-2 mb-4">
               <img src="/logo.png" alt="" className="h-7 w-7 rounded-md ring-1 ring-zinc-800" />
               <span className="font-mono text-sm text-zinc-100">senix</span>

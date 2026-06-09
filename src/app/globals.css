@@ -61,6 +61,15 @@ body {
   background-position: 0 0;
 }
 
+/* Hero-only dot field. Very low opacity dots in the cool border tone give
+   the dark hero subtle depth (Vercel-style) without competing with the
+   foreground content. */
+.bg-hero-dots {
+  background-image: radial-gradient(rgba(150, 170, 158, 0.05) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: center top;
+}
+
 /* Soft green radial glow used behind the product showcase + final CTA. */
 .bg-glow-green {
   background: radial-gradient(
