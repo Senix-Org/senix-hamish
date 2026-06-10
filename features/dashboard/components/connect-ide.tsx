@@ -13,6 +13,7 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import { TokenReveal } from '@features/dashboard/components/token-reveal';
+import { useToast } from '@features/dashboard/components/toast';
 import {
   claudeCodeCliCommand,
   claudeCodeConfigJson,
@@ -247,6 +248,7 @@ function TokenStep({
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   async function generate(): Promise<void> {
     if (busy) return;
@@ -261,11 +263,14 @@ function TokenStep({
       const data = (await res.json()) as { token?: string; error?: string };
       if (!res.ok || !data.token) {
         setError(data.error ?? 'Could not generate a token. Try again.');
+        toast('Something went wrong. Please try again.', 'error');
         return;
       }
       onToken(data.token);
+      toast("Token generated. Copy it now — it won't be shown again.", 'warning');
     } catch {
       setError('Could not reach the server. Check your connection and try again.');
+      toast('Something went wrong. Please try again.', 'error');
     } finally {
       setBusy(false);
     }
@@ -607,11 +612,13 @@ function CopyButton({
   iconOnly?: boolean;
 }): React.ReactElement {
   const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
 
   async function copy(): Promise<void> {
     try {
       await navigator.clipboard.writeText(value);
       setCopied(true);
+      toast('Copied to clipboard.', 'neutral');
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard access can be blocked; the block is selectable as a fallback.

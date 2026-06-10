@@ -57,7 +57,7 @@ export function SiteFooter(): React.ReactElement {
               <span className="font-mono text-sm text-zinc-100">senix</span>
             </Link>
             <p className="text-xs text-zinc-500 leading-relaxed max-w-[16rem]">
-              Behavioral PR review for teams shipping with AI.
+              AI code review for every pull request.
             </p>
           </div>
           {COLUMNS.map((col) => (

@@ -1,36 +1,29 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, ChevronRight } from 'lucide-react';
 import { createServerSupabaseClient } from '@features/shared/supabase-server';
 import { Reveal } from '@features/shared/components/reveal';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const RISK_BADGE: Record<string, string> = {
-  low: 'text-green-400 bg-green-950/40 border-green-900/50',
-  medium: 'text-yellow-400 bg-yellow-950/40 border-yellow-900/50',
-  high: 'text-red-400 bg-red-950/40 border-red-900/50',
+/** Severity tone for the overall risk level and the detected-risk tags. */
+const RISK_TONE: Record<string, string> = {
+  low: 'text-risk-low bg-risk-low/10 border-risk-low/30',
+  medium: 'text-risk-medium bg-risk-medium/10 border-risk-medium/30',
+  high: 'text-risk-high bg-risk-high/10 border-risk-high/30',
+  critical: 'text-risk-high bg-risk-high/20 border-risk-high/40',
 };
 
 const CHANGE_COLOR: Record<string, string> = {
-  added: 'text-green-400',
-  removed: 'text-red-400',
-  modified: 'text-yellow-400',
+  added: 'text-risk-low',
+  removed: 'text-risk-high',
+  modified: 'text-risk-medium',
 };
 
-type FocusArea = {
-  file: string;
-  lines: string;
-  reason: string;
-};
+type FocusArea = { file: string; lines: string; reason: string };
 
-type StructuralChange = {
-  change: string;
-  kind: string;
-  id: string;
-  name?: string;
-};
+type StructuralChange = { change: string; kind: string; id: string; name?: string };
 
 type StructuralFile = {
   filename: string;
@@ -71,9 +64,11 @@ type AnalysisDetail = {
 };
 
 /**
- * Detail view for a single analysis. RLS scopes the row to the
- * signed-in user — `notFound()` covers both "no such id" and "you
- * don't own this".
+ * Detail view for a single analysis, laid out as a review report: a
+ * breadcrumb, a header card, then cards for the behavioral summary,
+ * detected risks, reviewer focus, and the structural diff. RLS scopes the
+ * row to the signed-in user, so `notFound()` covers both "no such id" and
+ * "not yours".
  */
 export default async function AnalysisDetailPage({
   params,
@@ -99,114 +94,142 @@ export default async function AnalysisDetailPage({
 
   const pr = data.pull_requests;
   const repoName = pr?.repositories?.full_name ?? 'unknown';
+  const prNumber = pr?.github_pr_number;
   const flags = data.risk_flags ?? {};
   const detectedRisks = flags.detected_risks ?? [];
   const focusAreas = data.focus_areas ?? [];
   const structural = flags.structural_diff ?? [];
-  const riskBadgeClass =
-    (data.risk_level && RISK_BADGE[data.risk_level]) ??
-    'text-zinc-400 bg-zinc-800 border-zinc-700';
+  const riskTone =
+    (data.risk_level && RISK_TONE[data.risk_level]) ??
+    'text-muted bg-surface-raised border-surface-border';
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
+      {/* Breadcrumb */}
       <Reveal>
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-200 transition-colors"
-        >
-          <ArrowLeft size={14} />
-          Back to dashboard
-        </Link>
+        <nav className="flex items-center gap-1.5 text-sm text-muted">
+          <Link href="/dashboard/reviews" className="transition-colors hover:text-primary">
+            Reviews
+          </Link>
+          <ChevronRight size={14} className="text-surface-border" />
+          <span className="text-secondary">
+            {prNumber !== undefined ? `PR #${prNumber}` : 'Review'}
+          </span>
+        </nav>
       </Reveal>
 
-      <Reveal delay={0.05}>
-        <header className="space-y-3">
-          <div className="text-xs text-zinc-500 flex flex-wrap items-center gap-2 font-mono">
-            <span className="text-zinc-300">{repoName}</span>
-            {pr?.github_pr_number !== undefined && (
-              <span className="text-zinc-500">#{pr.github_pr_number}</span>
+      {/* Header card */}
+      <Reveal delay={0.04}>
+        <header className="rounded-xl border border-surface-border bg-surface p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 font-mono text-sm text-secondary">
+                <span className="text-primary">{repoName}</span>
+                {prNumber !== undefined && <span className="text-muted">#{prNumber}</span>}
+                {pr?.author_login && <span className="text-muted">· by {pr.author_login}</span>}
+                <span className="text-muted" suppressHydrationWarning>
+                  · {new Date(data.created_at).toLocaleDateString()}
+                </span>
+              </div>
+              <h1 className="mt-2 text-2xl font-semibold leading-snug tracking-[-0.01em] text-primary">
+                {pr?.title ?? '(untitled PR)'}
+              </h1>
+            </div>
+
+            {data.github_comment_url && (
+              <a
+                href={data.github_comment_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-senix btn-senix-secondary shrink-0 self-start"
+              >
+                View on GitHub
+                <ArrowUpRight size={14} />
+              </a>
             )}
-            {pr?.author_login && <span className="text-zinc-500">· by {pr.author_login}</span>}
-            <span className="text-zinc-500">
-              · {new Date(data.created_at).toLocaleString()}
-            </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.02em] text-zinc-100">
-            {pr?.title ?? '(untitled PR)'}
-          </h1>
-          <div className="flex items-center gap-3 text-xs">
-            {data.commit_sha && (
-              <span className="font-mono text-zinc-500">{data.commit_sha.slice(0, 7)}</span>
-            )}
+
+          {/* Status row */}
+          <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-surface-border pt-4">
             <StatusPill status={data.status} />
             {data.risk_level && (
               <span
-                className={`text-[10px] tracking-wider rounded-full px-2.5 py-1 font-bold uppercase border ${riskBadgeClass}`}
+                className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${riskTone}`}
               >
-                risk: {data.risk_level}
+                Risk: {data.risk_level}
               </span>
             )}
+            {data.commit_sha && (
+              <span className="font-mono text-xs text-muted">{data.commit_sha.slice(0, 7)}</span>
+            )}
+            <span className="ml-auto font-mono text-[11px] text-muted">{data.id}</span>
           </div>
         </header>
       </Reveal>
 
+      {/* Behavioral summary */}
       {data.summary && (
-        <Reveal delay={0.1}>
-          <section>
+        <Reveal delay={0.08}>
+          <Card>
             <SectionLabel>Behavioral summary</SectionLabel>
-            <p className="text-base text-zinc-100 leading-relaxed max-w-3xl">{data.summary}</p>
-          </section>
+            <p className="text-[15px] leading-relaxed text-primary">{data.summary}</p>
+          </Card>
         </Reveal>
       )}
 
+      {/* Detected risks */}
       {detectedRisks.length > 0 && (
-        <Reveal delay={0.12}>
-          <section>
+        <Reveal delay={0.1}>
+          <Card>
             <SectionLabel>Detected risks</SectionLabel>
             <div className="flex flex-wrap gap-1.5">
               {detectedRisks.map((r, i) => (
-                <code
+                <span
                   key={i}
-                  className="font-mono text-xs bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-md px-2 py-1"
+                  className={`rounded-md border px-2 py-1 font-mono text-xs ${riskTone}`}
                 >
                   {r}
-                </code>
+                </span>
               ))}
             </div>
-          </section>
+          </Card>
         </Reveal>
       )}
 
+      {/* Reviewer focus */}
       {focusAreas.length > 0 && (
-        <Reveal delay={0.14}>
-          <section>
-            <SectionLabel>Reviewer should focus on</SectionLabel>
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-zinc-900/80 text-zinc-400 text-[11px] uppercase tracking-wider">
+        <Reveal delay={0.12}>
+          <Card padded={false}>
+            <div className="p-6 pb-3">
+              <SectionLabel className="mb-0">Reviewer should focus on</SectionLabel>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[32rem] text-sm">
+                <thead className="bg-surface-raised text-[11px] uppercase tracking-wider text-muted">
                   <tr>
-                    <th className="text-left px-4 py-2.5 font-medium">File</th>
-                    <th className="text-left px-4 py-2.5 font-medium w-24">Lines</th>
-                    <th className="text-left px-4 py-2.5 font-medium">Why</th>
+                    <th className="px-6 py-2.5 text-left font-medium">File</th>
+                    <th className="w-24 px-4 py-2.5 text-left font-medium">Lines</th>
+                    <th className="px-4 py-2.5 text-left font-medium">Why</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
+                <tbody className="divide-y divide-surface-border">
                   {focusAreas.map((f, i) => (
-                    <tr key={i} className="hover:bg-zinc-900/40 transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-zinc-100">{f.file}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-zinc-400">{f.lines}</td>
-                      <td className="px-4 py-3 text-zinc-200 leading-relaxed">{f.reason}</td>
+                    <tr key={i} className="transition-colors hover:bg-surface-raised/40">
+                      <td className="px-6 py-3 font-mono text-xs text-primary">{f.file}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted">{f.lines}</td>
+                      <td className="px-4 py-3 leading-relaxed text-secondary">{f.reason}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          </section>
+          </Card>
         </Reveal>
       )}
 
+      {/* Structural diff */}
       {structural.length > 0 && (
-        <Reveal delay={0.16}>
+        <Reveal delay={0.14}>
           <section>
             <SectionLabel>Structural diff</SectionLabel>
             <div className="space-y-2">
@@ -218,62 +241,66 @@ export default async function AnalysisDetailPage({
         </Reveal>
       )}
 
-      <Reveal delay={0.18}>
-        <section className="text-xs text-zinc-500 flex flex-wrap gap-x-5 gap-y-2 border-t border-zinc-800 pt-5 font-mono">
+      {/* Footer metadata */}
+      <Reveal delay={0.16}>
+        <section className="flex flex-wrap gap-x-5 gap-y-2 border-t border-surface-border pt-5 font-mono text-xs text-muted">
           {data.tokens_used !== null && <span>{data.tokens_used.toLocaleString()} tokens</span>}
-          {data.cost_usd_cents !== null && (
-            <span>${(data.cost_usd_cents / 100).toFixed(4)}</span>
-          )}
-          {flags.file_count !== undefined && <span>files={flags.file_count}</span>}
+          {data.cost_usd_cents !== null && <span>${(data.cost_usd_cents / 100).toFixed(4)}</span>}
+          {flags.file_count !== undefined && <span>{flags.file_count} files analyzed</span>}
           {flags.symbol_changes !== undefined && (
-            <span>symbol changes={flags.symbol_changes}</span>
+            <span>{flags.symbol_changes} symbol changes</span>
           )}
           {data.completed_at && (
-            <span>completed {new Date(data.completed_at).toLocaleString()}</span>
+            <span suppressHydrationWarning>
+              completed {new Date(data.completed_at).toLocaleString()}
+            </span>
           )}
         </section>
       </Reveal>
-
-      {data.github_comment_url && (
-        <Reveal delay={0.2}>
-          <a
-            href={data.github_comment_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group inline-flex items-center gap-1.5 px-5 py-2.5 rounded-md bg-green-500 hover:bg-green-400 text-zinc-950 font-medium text-sm transition"
-          >
-            View on GitHub
-            <ArrowUpRight
-              size={14}
-              className="transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-            />
-          </a>
-        </Reveal>
-      )}
     </div>
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }): React.ReactElement {
+function Card({
+  children,
+  padded = true,
+}: {
+  children: React.ReactNode;
+  padded?: boolean;
+}): React.ReactElement {
   return (
-    <div className="text-[11px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">
+    <section
+      className={`rounded-xl border border-surface-border bg-surface ${padded ? 'p-6' : ''}`}
+    >
       {children}
-    </div>
+    </section>
+  );
+}
+
+function SectionLabel({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode;
+  className?: string;
+}): React.ReactElement {
+  return (
+    <h2 className={`mb-3 text-sm font-semibold text-primary ${className}`}>{children}</h2>
   );
 }
 
 function StatusPill({ status }: { status: string }): React.ReactElement {
   const tone =
     status === 'completed'
-      ? 'text-green-400 bg-green-950/30 border-green-900/40'
+      ? 'text-risk-low bg-risk-low/10 border-risk-low/30'
       : status === 'failed'
-        ? 'text-red-400 bg-red-950/30 border-red-900/40'
+        ? 'text-risk-high bg-risk-high/10 border-risk-high/30'
         : status === 'running'
-          ? 'text-blue-400 bg-blue-950/30 border-blue-900/40'
-          : 'text-zinc-400 bg-zinc-900 border-zinc-800';
+          ? 'text-accent bg-accent/10 border-accent/30'
+          : 'text-secondary bg-surface-raised border-surface-border';
   return (
     <span
-      className={`text-[10px] tracking-wider rounded-full px-2.5 py-1 font-bold uppercase border ${tone}`}
+      className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${tone}`}
     >
       {status}
     </span>
@@ -284,26 +311,29 @@ function StructuralFileBlock({ file }: { file: StructuralFile }): React.ReactEle
   const meaningfulChanges = file.changes.filter((c) => c.change !== 'unchanged');
 
   return (
-    <details className="group rounded-xl border border-zinc-800 bg-zinc-900/40 hover:border-zinc-700 transition-colors">
-      <summary className="cursor-pointer px-5 py-3 text-sm flex items-center gap-3 list-none [&::-webkit-details-marker]:hidden">
-        <span className="font-mono text-zinc-100">{file.filename}</span>
-        <span className="text-zinc-500 text-xs font-mono">({file.language})</span>
-        <span className="ml-auto text-xs font-mono text-zinc-400 tabular-nums">
-          <span className="text-green-400">+{file.summary.added}</span>{' '}
-          <span className="text-yellow-400">~{file.summary.modified}</span>{' '}
-          <span className="text-red-400">-{file.summary.removed}</span>
+    <details className="group rounded-xl border border-surface-border bg-surface transition-colors hover:border-neutral-border">
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-3 text-sm [&::-webkit-details-marker]:hidden">
+        <span className="truncate font-mono text-primary">{file.filename}</span>
+        <span className="font-mono text-xs text-muted">({file.language})</span>
+        <span className="ml-auto shrink-0 font-mono text-xs tabular-nums">
+          <span className="text-risk-low">+{file.summary.added}</span>{' '}
+          <span className="text-risk-medium">~{file.summary.modified}</span>{' '}
+          <span className="text-risk-high">-{file.summary.removed}</span>
         </span>
-        <span className="text-zinc-500 transition-transform group-open:rotate-90">›</span>
+        <ChevronRight
+          size={15}
+          className="shrink-0 text-muted transition-transform group-open:rotate-90"
+        />
       </summary>
       {meaningfulChanges.length > 0 && (
-        <div className="px-5 py-4 border-t border-zinc-800 space-y-1.5 font-mono text-xs">
+        <div className="space-y-1.5 border-t border-surface-border px-5 py-4 font-mono text-xs">
           {meaningfulChanges.map((c, j) => (
             <div key={j} className="flex items-baseline gap-3">
-              <span className={`${CHANGE_COLOR[c.change] ?? 'text-zinc-400'} w-20 shrink-0`}>
+              <span className={`${CHANGE_COLOR[c.change] ?? 'text-muted'} w-20 shrink-0`}>
                 {c.change}
               </span>
-              <span className="text-zinc-500 w-16 shrink-0">{c.kind}</span>
-              <span className="text-zinc-200 truncate">{c.name ?? c.id}</span>
+              <span className="w-16 shrink-0 text-muted">{c.kind}</span>
+              <span className="truncate text-secondary">{c.name ?? c.id}</span>
             </div>
           ))}
         </div>

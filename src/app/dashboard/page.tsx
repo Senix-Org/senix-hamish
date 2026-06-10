@@ -158,7 +158,7 @@ export default async function DashboardPage({
           <h2 className="text-lg font-semibold text-primary">Connected repositories</h2>
           <a href={installUrl} className="btn-senix btn-senix-secondary">
             <Plus size={15} strokeWidth={2} />
-            Add repository
+            Connect repo
           </a>
         </div>
         {repos.length === 0 ? (
@@ -237,13 +237,13 @@ function ReposEmptyState({ installUrl }: { installUrl: string }): React.ReactEle
   return (
     <div className="repo-list">
       <div className="flex flex-col items-center px-6 py-12 text-center">
-        <p className="text-sm font-medium text-primary">No repositories connected</p>
+        <p className="text-sm font-medium text-primary">No repos connected yet</p>
         <p className="mt-1 max-w-xs text-sm text-secondary">
-          Connect a repo and Senix reviews every pull request automatically.
+          Connect your first repo to start getting reviews.
         </p>
         <a href={installUrl} className="btn-senix btn-senix-primary mt-5">
           <Plus size={15} strokeWidth={2} />
-          Connect a repository
+          Connect a repo
         </a>
       </div>
     </div>

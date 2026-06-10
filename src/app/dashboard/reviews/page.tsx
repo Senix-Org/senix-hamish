@@ -1,4 +1,5 @@
-import { GitPullRequest, AlertTriangle } from 'lucide-react';
+import Link from 'next/link';
+import { GitPullRequest } from 'lucide-react';
 import { createServerSupabaseClient } from '@features/shared/supabase-server';
 import { RecentAnalyses } from '@features/dashboard/components/recent-analyses';
 import { RealtimeReviews } from '@features/dashboard/components/realtime-reviews';
@@ -41,22 +42,10 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
     .order('created_at', { ascending: false })
     .limit(200);
 
-  const header = (
-    <header>
-      <h1 className="text-3xl font-semibold text-primary">Reviews</h1>
-      <p className="mt-2 text-sm text-secondary">
-        Every review Senix has posted, newest first.
-      </p>
-    </header>
-  );
-
+  // Let failures bubble to the route's error.tsx boundary, which offers a
+  // retry that re-runs this query without a full-page reload.
   if (error) {
-    return (
-      <div>
-        {header}
-        <ReviewsErrorState message={error.message} />
-      </div>
-    );
+    throw new Error(error.message);
   }
 
   const analyses = (data ?? []) as unknown as AnalysisRow[];
@@ -74,7 +63,12 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
 
   return (
     <div>
-      {header}
+      <header>
+        <h1 className="text-3xl font-semibold text-primary">Reviews</h1>
+        <p className="mt-2 text-sm text-secondary">
+          Every review Senix has posted, newest first.
+        </p>
+      </header>
       <section className="mt-8">
         {cards.length === 0 ? <ReviewsEmptyState /> : <RecentAnalyses analyses={cards} />}
       </section>
@@ -89,19 +83,11 @@ function ReviewsEmptyState(): React.ReactElement {
       <GitPullRequest size={32} strokeWidth={1.5} className="text-muted" />
       <p className="mt-4 text-sm font-medium text-primary">No reviews yet</p>
       <p className="mt-1 max-w-xs text-sm text-secondary">
-        Open a pull request in a connected repo and Senix will review it within 30 seconds. It
-        will show up here automatically.
+        Open a pull request on a connected repo and Senix will review it within 30 seconds.
       </p>
-    </div>
-  );
-}
-
-function ReviewsErrorState({ message }: { message: string }): React.ReactElement {
-  return (
-    <div className="mt-8 flex flex-col items-center rounded-xl border border-risk-high/30 bg-risk-high/5 py-16 text-center">
-      <AlertTriangle size={32} strokeWidth={1.5} className="text-risk-high" />
-      <p className="mt-4 text-sm font-medium text-primary">Could not load your reviews</p>
-      <p className="mt-1 max-w-sm text-sm text-secondary">{message}</p>
+      <Link href="/dashboard" className="btn-senix btn-senix-secondary mt-5">
+        View connected repos
+      </Link>
     </div>
   );
 }

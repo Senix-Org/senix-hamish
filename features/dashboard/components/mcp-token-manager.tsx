@@ -6,6 +6,7 @@ import { Loader2, Plus, X } from 'lucide-react';
 import { formatRelativeTime } from '@features/shared/relative-time';
 import { generateMcpToken, revokeMcpToken } from '@/app/dashboard/tokens/actions';
 import { TokenReveal } from '@features/dashboard/components/token-reveal';
+import { useToast } from '@features/dashboard/components/toast';
 
 export type McpTokenView = {
   id: string;
@@ -119,6 +120,7 @@ export function McpTokenManager({
 
 function TokenRow({ token }: { token: McpTokenView }): React.ReactElement {
   const router = useRouter();
+  const { toast } = useToast();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -132,9 +134,11 @@ function TokenRow({ token }: { token: McpTokenView }): React.ReactElement {
     const result = await revokeMcpToken(token.id);
     if (result.ok) {
       setConfirming(false);
+      toast('Token revoked successfully.', 'success');
       router.refresh();
     } else {
       setError(result.error);
+      toast('Something went wrong. Please try again.', 'error');
       setBusy(false);
     }
   }
@@ -232,6 +236,7 @@ function RevokeConfirmModal({
 
 function GenerateModal({ onClose }: { onClose: () => void }): React.ReactElement {
   const router = useRouter();
+  const { toast } = useToast();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -272,8 +277,10 @@ function GenerateModal({ onClose }: { onClose: () => void }): React.ReactElement
     const result = await generateMcpToken(name.trim());
     if (result.ok) {
       setToken(result.token);
+      toast("Token generated. Copy it now — it won't be shown again.", 'warning');
     } else {
       setError(result.error);
+      toast('Something went wrong. Please try again.', 'error');
     }
     setBusy(false);
   }
@@ -312,7 +319,10 @@ function GenerateModal({ onClose }: { onClose: () => void }): React.ReactElement
           <div className="p-6 pt-4">
             <TokenReveal
               token={token}
-              onCopied={() => setCanClose(true)}
+              onCopied={() => {
+                setCanClose(true);
+                toast('Copied to clipboard.', 'neutral');
+              }}
               onExpired={() => setCanClose(true)}
             />
             {error && <p className="mt-3 text-xs text-risk-high">{error}</p>}

@@ -252,7 +252,7 @@ export function BillingClient({ planData, tiers, tokensThisCycle }: Props): Reac
           <h2 className="text-lg font-semibold text-primary">Compare plans</h2>
           <PeriodToggle period={period} onChange={setPeriod} />
         </div>
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 flex snap-x gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 lg:grid-cols-4">
           {tiers.map((tier) => (
             <PlanCard
               key={tier.plan}
@@ -418,7 +418,7 @@ function PlanCard({
 
   return (
     <div
-      className={`flex flex-col rounded-xl border bg-surface p-5 ${
+      className={`flex w-60 shrink-0 snap-start flex-col rounded-xl border bg-surface p-5 sm:w-auto sm:shrink ${
         isCurrent ? 'border-accent ring-1 ring-accent/40' : 'border-surface-border'
       }`}
     >

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { toggleRepoEnabled } from '@/app/dashboard/actions';
+import { useToast } from '@features/dashboard/components/toast';
 
 type Props = {
   repoId: string;
@@ -17,6 +18,7 @@ export default function RepoToggle({ repoId, enabled }: Props): React.ReactEleme
   const [optimistic, setOptimistic] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
 
   function onToggle(): void {
     const next = !optimistic;
@@ -27,8 +29,13 @@ export default function RepoToggle({ repoId, enabled }: Props): React.ReactEleme
       if (!result.ok) {
         setOptimistic(!next);
         setError(result.error);
+        toast('Something went wrong. Please try again.', 'error');
       } else {
         setOptimistic(result.enabled);
+        toast(
+          result.enabled ? 'Repository connected.' : 'Repository disconnected.',
+          'success'
+        );
       }
     });
   }
