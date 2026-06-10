@@ -40,6 +40,7 @@ beforeEach(() => {
 const samplePayload = {
   analysisId: 'a-1',
   pullRequestId: 'pr-1',
+  userId: 'user-1',
   installationId: 1,
   owner: 'o',
   repo: 'r',

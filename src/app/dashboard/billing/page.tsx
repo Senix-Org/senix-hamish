@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { currentAppUserId } from '@features/auth/mcp-tokens';
 import { getUserPlan, PLAN_LIMITS } from '@features/billing/plan-limits';
-import { getBillingUsage } from '@features/billing/billing-usage';
 import { supabaseAdmin } from '@features/shared/supabase';
 import { BillingClient, type BillingPlanData, type BillingTier } from './billing-client';
 
@@ -19,7 +18,7 @@ const TIERS: BillingTier[] = [
     label: PLAN_LIMITS.free.label,
     price: '$0',
     repos: PLAN_LIMITS.free.repos,
-    reviews: PLAN_LIMITS.free.reviews,
+    tokens: PLAN_LIMITS.free.tokens,
     support: 'Community',
     trial: 'None',
   },
@@ -28,7 +27,7 @@ const TIERS: BillingTier[] = [
     label: PLAN_LIMITS.starter.label,
     price: '$18',
     repos: PLAN_LIMITS.starter.repos,
-    reviews: PLAN_LIMITS.starter.reviews,
+    tokens: PLAN_LIMITS.starter.tokens,
     support: 'Community',
     trial: 'None',
   },
@@ -37,7 +36,7 @@ const TIERS: BillingTier[] = [
     label: PLAN_LIMITS.team.label,
     price: '$79',
     repos: PLAN_LIMITS.team.repos,
-    reviews: PLAN_LIMITS.team.reviews,
+    tokens: PLAN_LIMITS.team.tokens,
     support: 'Email, 48 hour response',
     trial: 'None',
   },
@@ -46,7 +45,7 @@ const TIERS: BillingTier[] = [
     label: PLAN_LIMITS.pro.label,
     price: '$199',
     repos: PLAN_LIMITS.pro.repos,
-    reviews: PLAN_LIMITS.pro.reviews,
+    tokens: PLAN_LIMITS.pro.tokens,
     support: 'Priority, 24 hour response',
     trial: 'None',
   },
@@ -58,14 +57,13 @@ export default async function BillingPage(): Promise<React.ReactElement> {
     redirect('/login?next=/dashboard/billing');
   }
 
-  const [userPlan, billingUserResult, usage] = await Promise.all([
+  const [userPlan, billingUserResult] = await Promise.all([
     getUserPlan(userId),
     supabaseAdmin
       .from('users')
       .select('plan_expires_at, whop_membership_id')
       .eq('id', userId)
       .maybeSingle() as unknown as Promise<{ data: BillingUserRow | null }>,
-    getBillingUsage(userId),
   ]);
 
   const planData: BillingPlanData = {
@@ -74,23 +72,12 @@ export default async function BillingPage(): Promise<React.ReactElement> {
     trialEndsAt: userPlan.trialEndsAt,
     planExpiresAt: billingUserResult.data?.plan_expires_at ?? null,
     whopMembershipId: billingUserResult.data?.whop_membership_id ?? null,
-    reviewsUsed: userPlan.reviewsUsed,
-    prReviewsThisMonth: userPlan.prReviewsThisMonth,
-    mcpReviewsThisMonth: userPlan.mcpReviewsThisMonth,
-    reviewLimit: userPlan.reviewLimit,
+    tokensUsed: userPlan.tokensUsed,
+    tokenLimit: userPlan.tokenLimit,
     reposConnected: userPlan.reposConnected,
     repoLimit: userPlan.repoLimit,
-    reviewsResetAt: userPlan.reviewsResetAt,
+    tokensResetAt: userPlan.tokensResetAt,
   };
 
-  // Tokens consumed in the current billing cycle (since the quota reset).
-  const cycleStartMs = new Date(userPlan.reviewsResetAt).getTime();
-  const tokensThisCycle = usage.analyses
-    .filter((a) => {
-      const ts = new Date(a.createdAt).getTime();
-      return Number.isNaN(cycleStartMs) || ts >= cycleStartMs;
-    })
-    .reduce((sum, a) => sum + a.tokensUsed, 0);
-
-  return <BillingClient planData={planData} tiers={TIERS} tokensThisCycle={tokensThisCycle} />;
+  return <BillingClient planData={planData} tiers={TIERS} />;
 }

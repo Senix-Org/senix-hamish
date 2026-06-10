@@ -14,6 +14,7 @@ function isAnalyzePrPayload(value: unknown): value is AnalyzePrPayload {
   return (
     typeof v.analysisId === 'string' &&
     typeof v.pullRequestId === 'string' &&
+    typeof v.userId === 'string' &&
     typeof v.installationId === 'number' &&
     typeof v.owner === 'string' &&
     typeof v.repo === 'string' &&

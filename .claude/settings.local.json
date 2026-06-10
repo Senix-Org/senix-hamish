@@ -2,7 +2,20 @@
   "permissions": {
     "allow": [
       "Bash(npx tsc *)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(grep -viE \"test|//.*eslint\")",
+      "Bash(npm test *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git check-ignore *)",
+      "Bash(git mv *)",
+      "Bash(mv src/app/api/og/route.ts src/app/api/og/route.tsx)",
+      "Bash(npx next *)",
+      "Bash(git commit -q -m ' *)",
+      "Bash(ls docs/migrations)",
+      "Bash(ls supabase *)",
+      "Bash(grep -rln \"pr_reviews_this_month\\\\|reviews_reset_at\\\\|mcp_reviews_this_month\" docs supabase)",
+      "Bash(grep -rln \"increment_playground_rate_limit\\\\|playground_rate\" docs supabase)"
     ]
   }
 }

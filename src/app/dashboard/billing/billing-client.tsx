@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, CreditCard, GitPullRequest, Loader2, Sparkles, X, Zap } from 'lucide-react';
+import { Check, CreditCard, Loader2, Sparkles, X, Zap } from 'lucide-react';
 
 export type BillingPlanName = 'free' | 'starter' | 'team' | 'pro';
 export type BillingPlanStatus = 'active' | 'trialing' | 'cancelled' | 'past_due';
@@ -11,7 +11,7 @@ export type BillingTier = {
   label: string;
   price: string;
   repos: number;
-  reviews: number;
+  tokens: number;
   support: string;
   trial: string;
 };
@@ -22,19 +22,16 @@ export type BillingPlanData = {
   trialEndsAt: string | null;
   planExpiresAt: string | null;
   whopMembershipId: string | null;
-  reviewsUsed: number;
-  prReviewsThisMonth: number;
-  mcpReviewsThisMonth: number;
-  reviewLimit: number;
+  tokensUsed: number;
+  tokenLimit: number;
   reposConnected: number;
   repoLimit: number;
-  reviewsResetAt: string;
+  tokensResetAt: string;
 };
 
 type Props = {
   planData: BillingPlanData;
   tiers: BillingTier[];
-  tokensThisCycle: number;
 };
 
 const PLAN_ORDER: BillingPlanName[] = ['free', 'starter', 'team', 'pro'];
@@ -63,7 +60,7 @@ const PLAN_PRICING: Record<BillingPlanName, {
  * side-by-side plan comparison. Analytics charts deliberately live
  * elsewhere — this page is for understanding the plan and upgrading fast.
  */
-export function BillingClient({ planData, tiers, tokensThisCycle }: Props): React.ReactElement {
+export function BillingClient({ planData, tiers }: Props): React.ReactElement {
   const [currentPlanData, setCurrentPlanData] = useState(planData);
   const [checkoutBusy, setCheckoutBusy] = useState<BillingPlanName | null>(null);
   const [cancelBusy, setCancelBusy] = useState(false);
@@ -77,12 +74,12 @@ export function BillingClient({ planData, tiers, tokensThisCycle }: Props): Reac
   const nextTier = getNextTier(currentPlanData.plan, tiers);
   const paidPlan = currentPlanData.plan !== 'free';
 
-  const reviewProgress = Math.min(
+  const tokenProgress = Math.min(
     100,
-    (currentPlanData.reviewsUsed / Math.max(currentPlanData.reviewLimit, 1)) * 100
+    (currentPlanData.tokensUsed / Math.max(currentPlanData.tokenLimit, 1)) * 100
   );
-  const reviewProgressTone =
-    reviewProgress >= 100 ? 'bg-risk-high' : reviewProgress >= 80 ? 'bg-amber-500' : 'bg-accent';
+  const tokenProgressTone =
+    tokenProgress >= 100 ? 'bg-risk-high' : tokenProgress >= 80 ? 'bg-amber-500' : 'bg-accent';
 
   async function startCheckout(plan: BillingPlanName): Promise<void> {
     setCheckoutBusy(plan);
@@ -190,20 +187,20 @@ export function BillingClient({ planData, tiers, tokensThisCycle }: Props): Reac
         {/* Usage bar */}
         <div className="mt-6">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-secondary">Reviews used this cycle</span>
+            <span className="text-secondary">Tokens used this month</span>
             <span className="tabular-nums text-primary">
-              {currentPlanData.reviewsUsed.toLocaleString()} of{' '}
-              {currentPlanData.reviewLimit.toLocaleString()}
+              {currentPlanData.tokensUsed.toLocaleString()} /{' '}
+              {currentPlanData.tokenLimit.toLocaleString()} tokens
             </span>
           </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-raised">
             <div
-              className={`h-full rounded-full transition-all ${reviewProgressTone}`}
-              style={{ width: `${reviewProgress}%` }}
+              className={`h-full rounded-full transition-all ${tokenProgressTone}`}
+              style={{ width: `${tokenProgress}%` }}
             />
           </div>
           <p className="mt-2 text-xs text-muted">
-            Quota resets {formatDate(nextResetDate(currentPlanData.reviewsResetAt))}
+            Quota resets {formatDate(nextResetDate(currentPlanData.tokensResetAt))}
           </p>
         </div>
 
@@ -221,18 +218,12 @@ export function BillingClient({ planData, tiers, tokensThisCycle }: Props): Reac
       </section>
 
       {/* Usage overview */}
-      <section className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard
-          icon={<GitPullRequest size={16} className="text-accent" />}
-          label="Reviews this cycle"
-          value={currentPlanData.reviewsUsed.toLocaleString()}
-          sub={`of ${currentPlanData.reviewLimit.toLocaleString()} included`}
-        />
+      <section className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <StatCard
           icon={<Zap size={16} className="text-accent" />}
-          label="Tokens used"
-          value={formatCompact(tokensThisCycle)}
-          sub="this cycle"
+          label="Tokens used this month"
+          value={currentPlanData.tokensUsed.toLocaleString()}
+          sub={`of ${currentPlanData.tokenLimit.toLocaleString()} included`}
         />
         <StatCard
           icon={<Sparkles size={16} className="text-accent" />}
@@ -411,7 +402,7 @@ function PlanCard({
     : 0;
 
   const features = [
-    `${tier.reviews.toLocaleString()} reviews / month`,
+    `${tier.tokens.toLocaleString()} tokens / month`,
     formatRepos(tier.repos),
     tier.support,
   ];
@@ -545,10 +536,4 @@ function formatDate(value: string): string {
 function formatRepos(repos: number): string {
   if (repos === -1) return 'Unlimited repos';
   return `${repos.toLocaleString()} ${repos === 1 ? 'repo' : 'repos'}`;
-}
-
-function formatCompact(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
-  return value.toLocaleString();
 }

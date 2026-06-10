@@ -8,8 +8,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * Failure means: free users could exceed limits and consume paid capacity.
  */
 
-const { checkReviewLimit, upsertPRComment, enqueue, findRepository } = vi.hoisted(() => ({
-  checkReviewLimit: vi.fn(),
+const { checkTokenLimit, upsertPRComment, enqueue, findRepository } = vi.hoisted(() => ({
+  checkTokenLimit: vi.fn(),
   upsertPRComment: vi.fn(),
   enqueue: vi.fn(),
   findRepository: vi.fn(),
@@ -24,7 +24,7 @@ function makeQuery() {
   return obj;
 }
 
-vi.mock('@features/billing/plan-limits', () => ({ checkReviewLimit }));
+vi.mock('@features/billing/plan-limits', () => ({ checkTokenLimit }));
 vi.mock('@features/github-integration/github-comments', () => ({ upsertPRComment }));
 vi.mock('@features/review-queue/queue', () => ({ enqueue }));
 vi.mock('@features/webhook/handlers/lookup', () => ({ findRepository }));
@@ -51,7 +51,7 @@ beforeEach(() => {
 
 describe('handlePullRequest at plan limit', () => {
   it('blocks the review, posts a limit-reached comment, and does not enqueue', async () => {
-    checkReviewLimit.mockResolvedValue({ allowed: false, reason: 'Monthly review limit reached for the Free plan.' });
+    checkTokenLimit.mockResolvedValue({ allowed: false, reason: 'Monthly token budget reached for the Free plan.' });
 
     const result = await handlePullRequest(payload);
 
@@ -59,12 +59,12 @@ describe('handlePullRequest at plan limit', () => {
     expect(enqueue).not.toHaveBeenCalled();
     expect(upsertPRComment).toHaveBeenCalledOnce();
     const body = upsertPRComment.mock.calls[0][0].commentBody as string;
-    expect(body).toMatch(/reached your Senix review limit/i);
+    expect(body).toMatch(/token budget/i);
     expect(body).toMatch(/dashboard\/billing/);
   });
 
   it('proceeds to dispatch when under the limit', async () => {
-    checkReviewLimit.mockResolvedValue({ allowed: true });
+    checkTokenLimit.mockResolvedValue({ allowed: true });
     process.env.NEXT_PUBLIC_SITE_URL = '';
     process.env.INTERNAL_WORKER_SECRET = '';
 

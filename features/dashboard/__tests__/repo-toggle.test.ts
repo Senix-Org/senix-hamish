@@ -8,14 +8,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * or toggles would silently not save.
  */
 
-const { getUser, maybeSingle, update, revalidatePath } = vi.hoisted(() => ({
+const { getUser, maybeSingle, update, revalidatePath, checkRepoLimit } = vi.hoisted(() => ({
   getUser: vi.fn(),
   maybeSingle: vi.fn(),
   update: vi.fn(() => ({ eq: () => Promise.resolve({ error: null }) })),
   revalidatePath: vi.fn(),
+  checkRepoLimit: vi.fn(),
 }));
 
 vi.mock('next/cache', () => ({ revalidatePath }));
+// Repo-limit enforcement is covered in repo-toggle-limit.test.ts; here we
+// isolate the ownership/persistence logic by allowing the budget check.
+vi.mock('@features/billing/plan-limits', () => ({ checkRepoLimit }));
 vi.mock('@features/shared/supabase-server', () => ({
   createServerSupabaseClient: async () => ({ auth: { getUser } }),
 }));
@@ -34,6 +38,7 @@ beforeEach(() => {
   getUser.mockReset();
   maybeSingle.mockReset();
   update.mockClear();
+  checkRepoLimit.mockReset().mockResolvedValue({ allowed: true });
 });
 
 describe('toggleRepoEnabled', () => {

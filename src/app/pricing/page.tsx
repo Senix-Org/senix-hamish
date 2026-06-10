@@ -35,7 +35,7 @@ const TIERS: Tier[] = [
     blurb: 'For trying Senix on one repo',
     features: [
       `${PLAN_LIMITS.free.repos} repo`,
-      `${PLAN_LIMITS.free.reviews} reviews per month`,
+      `${PLAN_LIMITS.free.tokens.toLocaleString()} tokens per month`,
       'Community support',
       'Permanent free plan',
     ],
@@ -49,7 +49,7 @@ const TIERS: Tier[] = [
     blurb: 'For solo developers shipping often',
     features: [
       `${PLAN_LIMITS.starter.repos} repos`,
-      `${PLAN_LIMITS.starter.reviews} reviews per month`,
+      `${PLAN_LIMITS.starter.tokens.toLocaleString()} tokens per month`,
       'Community support',
       'Billed monthly',
     ],
@@ -63,7 +63,7 @@ const TIERS: Tier[] = [
     blurb: 'For small teams with shared repos',
     features: [
       `${PLAN_LIMITS.team.repos} repos`,
-      `${PLAN_LIMITS.team.reviews.toLocaleString()} reviews per month`,
+      `${PLAN_LIMITS.team.tokens.toLocaleString()} tokens per month`,
       'Email support, 48 hour response',
       'Billed monthly',
     ],
@@ -78,7 +78,7 @@ const TIERS: Tier[] = [
     blurb: 'For teams with larger review volume',
     features: [
       'Unlimited repos',
-      `${PLAN_LIMITS.pro.reviews.toLocaleString()} reviews per month`,
+      `${PLAN_LIMITS.pro.tokens.toLocaleString()} tokens per month`,
       'Priority support, 24 hour response',
       'Billed monthly',
     ],

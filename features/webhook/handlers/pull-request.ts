@@ -1,10 +1,14 @@
 import { waitUntil } from '@vercel/functions';
 import { supabaseAdmin } from '@features/shared/supabase';
 import { enqueue, type JobPayloadMap } from '@features/review-queue/queue';
-import { checkReviewLimit } from '@features/billing/plan-limits';
+import { checkTokenLimit } from '@features/billing/plan-limits';
 import { upsertPRComment } from '@features/github-integration/github-comments';
 import { getAppBaseUrl } from '@features/shared/mcp-config';
 import { findRepository } from './lookup';
+
+// Conservative up-front estimate for one PR review. The worker records the
+// real token count from the LLM response after the analysis completes.
+const ESTIMATED_TOKENS_PER_REVIEW = 2000;
 
 /**
  * Handles pull_request events. Action set is intentionally narrow.
@@ -15,7 +19,7 @@ import { findRepository } from './lookup';
  * All other actions are ignored. Closed/merged PRs don't need analysis.
  */
 const ACTIONS_WE_HANDLE = new Set(['opened', 'synchronize', 'reopened']);
-const LIMIT_REACHED_COMMENT = `You've reached your Senix review limit for this month. Upgrade at ${getAppBaseUrl()}/dashboard/billing`;
+const LIMIT_REACHED_COMMENT = `You've used your Senix token budget for this month. Upgrade at ${getAppBaseUrl()}/dashboard/billing for more.`;
 
 type RepositoryRow = {
   id: string;
@@ -95,7 +99,7 @@ export async function handlePullRequest(payload: PullRequestPayload): Promise<st
     throw new Error(`Failed to upsert PR: ${prError?.message ?? 'unknown'}`);
   }
 
-  const reviewLimit = await checkReviewLimit(userId, 'pr');
+  const reviewLimit = await checkTokenLimit(userId, ESTIMATED_TOKENS_PER_REVIEW, 'pr');
   if (!reviewLimit.allowed) {
     await postLimitReachedComment({
       pullRequestId: prRow.id,
@@ -135,6 +139,7 @@ export async function handlePullRequest(payload: PullRequestPayload): Promise<st
   const jobPayload: JobPayloadMap['analyze-pr'] = {
     analysisId: analysisRow.id,
     pullRequestId: prRow.id,
+    userId,
     installationId,
     owner,
     repo: repoName,

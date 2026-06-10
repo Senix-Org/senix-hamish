@@ -9,8 +9,10 @@ import { upsertPRComment } from '@features/github-integration/github-comments';
 import type { JobPayloadMap } from '@features/review-queue/queue';
 import { claimAnalysis } from '@features/review-queue/queue';
 import { getAppBaseUrl } from '@features/shared/mcp-config';
+import { isOverRepoLimit, recordTokenUsage } from '@features/billing/plan-limits';
 
 const MAX_FILES_FOR_STRUCTURAL_DIFF = 50;
+const REPO_LIMIT_COMMENT = `This repository is over your Senix plan's repo limit, so Senix skipped this review. Upgrade or disconnect repos at ${getAppBaseUrl()}/dashboard/billing`;
 
 type PrRow = { title: string | null; author_login: string | null };
 type InstallationStatusRow = { uninstalled_at: string | null };
@@ -28,7 +30,7 @@ type CommentContext = { analysisId: string; pullRequestId: string; installationI
 export async function processAnalyzePr(
   payload: JobPayloadMap['analyze-pr']
 ): Promise<void> {
-  const { analysisId, pullRequestId, installationId, owner, repo, prNumber, headSha, baseSha } =
+  const { analysisId, pullRequestId, userId, installationId, owner, repo, prNumber, headSha, baseSha } =
     payload;
 
   // Exactly-once ownership: the serverless analyze path and the standalone
@@ -57,6 +59,22 @@ export async function processAnalyzePr(
         status: 'completed',
         completed_at: new Date().toISOString(),
         error_message: 'skipped: installation uninstalled',
+      })
+      .eq('id', analysisId);
+    return;
+  }
+
+  // GAP 3: skip analysis (and LLM cost) for accounts currently over their
+  // repo cap, e.g. after a downgrade. Post a comment so the user knows why.
+  if (userId && (await isOverRepoLimit(userId))) {
+    console.log(`[worker] skipping job — user ${userId} is over their repo limit`);
+    await postPlainComment({ pullRequestId, installationId, owner, repo, prNumber }, REPO_LIMIT_COMMENT);
+    await supabaseAdmin
+      .from('analyses')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+        error_message: 'skipped: over repo limit',
       })
       .eq('id', analysisId);
     return;
@@ -162,6 +180,16 @@ export async function processAnalyzePr(
         github_comment_url: comment.commentUrl,
       })
       .eq('id', analysisId);
+
+    // Record actual token usage against the user's monthly budget (source of
+    // truth). Never fail the analysis over a usage-bookkeeping error.
+    if (userId && llmResult?.tokensUsed) {
+      try {
+        await recordTokenUsage(userId, llmResult.tokensUsed, 'pr');
+      } catch (usageErr) {
+        console.error(`[analyze-pr] ${analysisId}: failed to record token usage`, usageErr);
+      }
+    }
   } catch (err: any) {
     await supabaseAdmin
       .from('analyses')
@@ -172,6 +200,41 @@ export async function processAnalyzePr(
       })
       .eq('id', analysisId);
     throw err;
+  }
+}
+
+/**
+ * Post a plain text PR comment (used for non-analysis notices like the
+ * over-repo-limit skip). Honors POST_PR_COMMENTS=false and reuses any prior
+ * Senix comment so notices update in place. Best-effort: errors are logged.
+ */
+async function postPlainComment(
+  ctx: Omit<CommentContext, 'analysisId'>,
+  body: string
+): Promise<void> {
+  if (process.env.POST_PR_COMMENTS === 'false') return;
+
+  const { data: priorRow } = await supabaseAdmin
+    .from('analyses')
+    .select('github_comment_id')
+    .eq('pull_request_id', ctx.pullRequestId)
+    .not('github_comment_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const prior = (priorRow ?? null) as unknown as PriorCommentRow | null;
+
+  try {
+    await upsertPRComment({
+      installationId: ctx.installationId,
+      owner: ctx.owner,
+      repo: ctx.repo,
+      prNumber: ctx.prNumber,
+      commentBody: body,
+      existingCommentId: prior?.github_comment_id ?? null,
+    });
+  } catch (err) {
+    console.error('[worker] failed to post notice comment', err);
   }
 }
 

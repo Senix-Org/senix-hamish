@@ -29,7 +29,7 @@ export default function RepoToggle({ repoId, enabled }: Props): React.ReactEleme
       if (!result.ok) {
         setOptimistic(!next);
         setError(result.error);
-        toast('Something went wrong. Please try again.', 'error');
+        toast(result.error || 'Something went wrong. Please try again.', 'error');
       } else {
         setOptimistic(result.enabled);
         toast(

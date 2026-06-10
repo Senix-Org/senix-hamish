@@ -8,6 +8,7 @@ import { Redis } from '@upstash/redis';
      'analyze-pr': {
        analysisId: string;       // primary key of the row in `analyses`
        pullRequestId: string;    // primary key of the row in `pull_requests`
+       userId: string;           // app user who owns the installation (token budget)
        installationId: number;
        owner: string;
        repo: string;

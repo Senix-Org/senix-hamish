@@ -45,11 +45,15 @@ vi.mock('@features/github-integration/github-diff', () => ({ fetchPRFiles, fetch
 vi.mock('@features/ai-engine/cost-tracker', () => ({ isOverDailyCostCap }));
 vi.mock('@features/github-integration/github-comments', () => ({ upsertPRComment }));
 vi.mock('@features/review-queue/queue', () => ({ claimAnalysis }));
+vi.mock('@features/billing/plan-limits', () => ({
+  isOverRepoLimit: vi.fn().mockResolvedValue(false),
+  recordTokenUsage: vi.fn().mockResolvedValue(0),
+}));
 
 import { processAnalyzePr } from '@features/review-queue/worker/analyze-pr';
 
 const payload = {
-  analysisId: 'an-2', pullRequestId: 'pr-2', installationId: 42,
+  analysisId: 'an-2', pullRequestId: 'pr-2', userId: 'user-1', installationId: 42,
   owner: 'acme', repo: 'web', prNumber: 8, headSha: 'h', baseSha: 'b',
 };
 

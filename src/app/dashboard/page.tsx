@@ -87,12 +87,12 @@ export default async function DashboardPage({
     const userId = await currentAppUserId();
     if (userId) {
       const plan = await getUserPlan(userId);
-      const limit = plan.effectiveLimit.reviews;
+      const limit = plan.effectiveLimit.tokens;
       if (limit > 0) {
         usage = {
-          used: plan.reviewsUsed,
+          used: plan.tokensUsed,
           limit,
-          percent: Math.min(100, Math.round((plan.reviewsUsed / limit) * 100)),
+          percent: Math.min(100, Math.round((plan.tokensUsed / limit) * 100)),
         };
       }
     }
@@ -214,8 +214,8 @@ function UsageLimitBanner({
       )}
       <span className="flex-1">
         {blocked
-          ? `You've reached your monthly review limit (${usage.used} of ${usage.limit}). New pull requests won't be reviewed until your quota resets or you upgrade.`
-          : `You've used ${usage.percent}% of your monthly reviews (${usage.used} of ${usage.limit}).`}
+          ? `You've used all your tokens for this month (${usage.used.toLocaleString()} of ${usage.limit.toLocaleString()}). Upgrade to continue getting reviews.`
+          : `You've used ${usage.percent}% of your token budget this month (${usage.used.toLocaleString()} of ${usage.limit.toLocaleString()}).`}
       </span>
       <Link href="/dashboard/billing" className="btn-senix btn-senix-secondary shrink-0">
         Upgrade

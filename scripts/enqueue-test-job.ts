@@ -20,7 +20,7 @@ import 'dotenv/config';
      // Look up PR + repo + installation info
      const { data: pr } = await supabaseAdmin
        .from('pull_requests')
-       .select('github_pr_number, head_sha, base_sha, repository_id, repositories(full_name, installation_id, installations(github_installation_id))')
+       .select('github_pr_number, head_sha, base_sha, repository_id, repositories(full_name, installation_id, installations(github_installation_id, installed_by_user_id))')
        .eq('id', analysis.pull_request_id)
        .single();
    
@@ -35,6 +35,7 @@ import 'dotenv/config';
      const id = await enqueue('analyze-pr', {
        analysisId: analysis.id,
        pullRequestId: analysis.pull_request_id,
+       userId: repos.installations.installed_by_user_id,
        installationId: repos.installations.github_installation_id,
        owner,
        repo: repoName,

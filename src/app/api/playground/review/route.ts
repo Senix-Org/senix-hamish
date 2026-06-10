@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { analyzeFileChanges, formatShippingBrief } from '@features/ai-engine/analyze-changes';
 import { diffToChanges } from '@features/ai-engine/diff-to-changes';
-import { checkPlaygroundRateLimit, clientIp } from '@features/billing/playground-rate-limit';
+import {
+  checkPlaygroundTokenBudget,
+  clientIp,
+  recordPlaygroundTokens,
+} from '@features/billing/playground-rate-limit';
+import { currentAppUserId } from '@features/auth/mcp-tokens';
+import { checkTokenLimit, recordTokenUsage } from '@features/billing/plan-limits';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -10,16 +16,19 @@ export const maxDuration = 60;
 /**
  * POST /api/playground/review
  *
- * Public, no auth. Accepts a unified git diff, parses it into file
- * changes, and runs the same analysis pipeline the MCP `review_changes`
- * tool uses. Guarded by an IP rate limit (5/hour) and a 50 KB diff cap so
- * an anonymous endpoint cannot run up LLM cost.
+ * Accepts a unified git diff, parses it into file changes, and runs the same
+ * analysis pipeline the MCP `review_changes` tool uses. Anonymous callers are
+ * bounded by a per-IP daily token budget; signed-in callers spend against
+ * their monthly plan token budget. A 50 KB diff cap protects either path.
  *
  * Request body:  { "diff": "<unified diff string>" }
  * Response body: { "text": "<shipping brief>", "structuredContent": { ... } }
  */
 
 const MAX_DIFF_BYTES = 50 * 1024;
+// Conservative up-front estimate; the real token count is recorded after the
+// LLM responds.
+const ESTIMATED_TOKENS_PER_REVIEW = 2000;
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   let body: unknown;
@@ -47,20 +56,34 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // Rate limit before any expensive work. Fail closed on a counter error.
-  let rate;
+  // Identify the caller: signed-in users spend their monthly budget, anonymous
+  // users are bounded per-IP. Budget pre-check before any expensive work; fail
+  // closed on a counter error so an outage cannot become a free LLM path.
+  const userId = await currentAppUserId();
+  const ip = clientIp(req);
+
   try {
-    rate = await checkPlaygroundRateLimit(clientIp(req));
+    if (userId) {
+      const budget = await checkTokenLimit(userId, ESTIMATED_TOKENS_PER_REVIEW, 'playground');
+      if (!budget.allowed) {
+        return NextResponse.json(
+          { error: 'Monthly token budget reached. Upgrade your plan to keep reviewing.' },
+          { status: 402 }
+        );
+      }
+    } else {
+      const budget = await checkPlaygroundTokenBudget(ip);
+      if (!budget.allowed) {
+        return NextResponse.json(
+          { error: "You've used your free token allowance for today. Sign up for more." },
+          { status: 429 }
+        );
+      }
+    }
   } catch {
     return NextResponse.json(
       { error: 'Could not process the request right now. Try again shortly.' },
       { status: 500 }
-    );
-  }
-  if (!rate.allowed) {
-    return NextResponse.json(
-      { error: 'Playground limit reached. Sign up for unlimited reviews.' },
-      { status: 429 }
     );
   }
 
@@ -77,6 +100,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       title: 'playground-session',
       author: 'playground-session',
     });
+
+    // Record actual token usage. Best-effort: never fail the response the
+    // caller already earned over a usage-bookkeeping error.
+    try {
+      if (userId) {
+        await recordTokenUsage(userId, result.tokensUsed, 'playground');
+      } else {
+        await recordPlaygroundTokens(ip, result.tokensUsed);
+      }
+    } catch (usageErr) {
+      console.error('[playground] failed to record token usage', usageErr);
+    }
 
     return NextResponse.json({
       text: formatShippingBrief(result, filesReviewed),

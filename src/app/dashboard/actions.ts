@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createServerSupabaseClient } from '@features/shared/supabase-server';
 import { supabaseAdmin } from '@features/shared/supabase';
+import { checkRepoLimit } from '@features/billing/plan-limits';
 
 type ToggleResult = { ok: true; enabled: boolean } | { ok: false; error: string };
 
@@ -48,6 +49,19 @@ export async function toggleRepoEnabled(repoId: string): Promise<ToggleResult> {
   }
 
   const nextEnabled = !repo.enabled;
+
+  // GAP 1: enabling a repo must respect the plan's repo cap. (Disabling is
+  // always allowed so users can get back under their limit.)
+  if (nextEnabled) {
+    const limit = await checkRepoLimit(appUser.id);
+    if (!limit.allowed) {
+      return {
+        ok: false,
+        error: "You've reached your repo limit. Upgrade to connect more repos.",
+      };
+    }
+  }
+
   const { error: updateError } = await supabaseAdmin
     .from('repositories')
     .update({ enabled: nextEnabled })

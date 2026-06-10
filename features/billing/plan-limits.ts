@@ -1,27 +1,28 @@
 export const PLAN_LIMITS = {
-  free: { repos: 1, reviews: 30, label: 'Free' },
-  starter: { repos: 3, reviews: 200, label: 'Starter' },
-  team: { repos: 15, reviews: 1000, label: 'Team' },
-  pro: { repos: -1, reviews: 5000, label: 'Pro' },
+  free: { repos: 1, tokens: 50_000, label: 'Free' },
+  starter: { repos: 3, tokens: 400_000, label: 'Starter' },
+  team: { repos: 15, tokens: 1_000_000, label: 'Team' },
+  pro: { repos: -1, tokens: 2_500_000, label: 'Pro' },
 } as const;
 
 export const PLAN_ORDER = ['free', 'starter', 'team', 'pro'] as const;
 
 export type PlanName = keyof typeof PLAN_LIMITS;
 export type PlanStatus = 'active' | 'trialing' | 'cancelled' | 'past_due';
-export type ReviewSource = 'pr' | 'mcp';
+/** Where a token charge originated. Single shared monthly budget. */
+export type TokenSource = 'pr' | 'mcp' | 'playground';
 
 export type UserPlan = {
   userId: string;
   plan: PlanName;
   planStatus: PlanStatus;
   trialEndsAt: string | null;
-  prReviewsThisMonth: number;
-  mcpReviewsThisMonth: number;
-  reviewsResetAt: string;
+  tokensUsedThisMonth: number;
+  tokensResetAt: string;
   reposConnected: number;
-  reviewsUsed: number;
-  reviewLimit: number;
+  /** Alias of tokensUsedThisMonth for read-site clarity. */
+  tokensUsed: number;
+  tokenLimit: number;
   repoLimit: number;
   limit: (typeof PLAN_LIMITS)[PlanName];
   effectivePlan: PlanName;
@@ -32,9 +33,8 @@ type UserPlanRow = {
   plan: string | null;
   plan_status: string | null;
   trial_ends_at: string | null;
-  pr_reviews_this_month: number | null;
-  mcp_reviews_this_month: number | null;
-  reviews_reset_at: string | null;
+  tokens_used_this_month: number | null;
+  tokens_reset_at: string | null;
   repos_connected: number | null;
 };
 
@@ -101,7 +101,7 @@ export async function getUserPlan(userId: string): Promise<UserPlan> {
   const { data, error } = (await supabase
     .from('users')
     .select(
-      'plan, plan_status, trial_ends_at, pr_reviews_this_month, mcp_reviews_this_month, reviews_reset_at, repos_connected'
+      'plan, plan_status, trial_ends_at, tokens_used_this_month, tokens_reset_at, repos_connected'
     )
     .eq('id', userId)
     .maybeSingle()) as unknown as { data: UserPlanRow | null; error: { message: string } | null };
@@ -113,26 +113,24 @@ export async function getUserPlan(userId: string): Promise<UserPlan> {
     throw new Error('User not found.');
   }
 
-  let prReviews = data.pr_reviews_this_month ?? 0;
-  let mcpReviews = data.mcp_reviews_this_month ?? 0;
-  let reviewsResetAt = data.reviews_reset_at ?? currentMonthStart().toISOString();
+  let tokensUsed = data.tokens_used_this_month ?? 0;
+  let tokensResetAt = data.tokens_reset_at ?? currentMonthStart().toISOString();
 
-  if (isBeforeCurrentMonth(data.reviews_reset_at)) {
-    reviewsResetAt = currentMonthStart().toISOString();
-    prReviews = 0;
-    mcpReviews = 0;
+  // Auto-reset the monthly token counter at the start of each UTC month.
+  if (isBeforeCurrentMonth(data.tokens_reset_at)) {
+    tokensResetAt = currentMonthStart().toISOString();
+    tokensUsed = 0;
 
     const { error: resetError } = await supabase
       .from('users')
       .update({
-        pr_reviews_this_month: 0,
-        mcp_reviews_this_month: 0,
-        reviews_reset_at: reviewsResetAt,
+        tokens_used_this_month: 0,
+        tokens_reset_at: tokensResetAt,
       })
       .eq('id', userId);
 
     if (resetError) {
-      throw new Error(`Failed to reset monthly review counters: ${resetError.message}`);
+      throw new Error(`Failed to reset monthly token counter: ${resetError.message}`);
     }
   }
 
@@ -141,19 +139,17 @@ export async function getUserPlan(userId: string): Promise<UserPlan> {
   const activePlan = effectivePlan(plan, planStatus, data.trial_ends_at);
   const limit = PLAN_LIMITS[plan];
   const effectiveLimit = PLAN_LIMITS[activePlan];
-  const reviewsUsed = prReviews + mcpReviews;
 
   return {
     userId,
     plan,
     planStatus,
     trialEndsAt: data.trial_ends_at,
-    prReviewsThisMonth: prReviews,
-    mcpReviewsThisMonth: mcpReviews,
-    reviewsResetAt,
+    tokensUsedThisMonth: tokensUsed,
+    tokensResetAt,
     reposConnected: data.repos_connected ?? 0,
-    reviewsUsed,
-    reviewLimit: limit.reviews,
+    tokensUsed,
+    tokenLimit: limit.tokens,
     repoLimit: limit.repos,
     limit,
     effectivePlan: activePlan,
@@ -161,36 +157,60 @@ export async function getUserPlan(userId: string): Promise<UserPlan> {
   };
 }
 
-export async function checkReviewLimit(
+/**
+ * Pre-flight token budget gate. Returns blocked when the user's current
+ * monthly usage plus the estimated cost of this review would exceed their
+ * plan's token budget. Does not mutate usage — the actual count is recorded
+ * after the LLM completes via {@link recordTokenUsage}.
+ */
+export async function checkTokenLimit(
   userId: string,
-  source: ReviewSource
+  estimatedTokens: number,
+  // `source` is accepted for call-site clarity and future per-source metering.
+  _source: TokenSource
 ): Promise<LimitResult> {
-  const counterField =
-    source === 'pr' ? 'pr_reviews_this_month' : 'mcp_reviews_this_month';
+  const userPlan = await getUserPlan(userId);
+  const limit = userPlan.effectiveLimit.tokens;
+  const estimate = Math.max(0, Math.round(estimatedTokens));
+
+  if (userPlan.tokensUsed + estimate > limit) {
+    return {
+      allowed: false,
+      reason: `Monthly token budget reached for the ${userPlan.effectiveLimit.label} plan.`,
+    };
+  }
+
+  return { allowed: true };
+}
+
+/**
+ * Record actual token usage after a review completes. This is the source of
+ * truth for monthly usage. Increments `tokens_used_this_month` by the real
+ * token count using optimistic locking with retries, so concurrent reviews
+ * cannot clobber each other's increments.
+ */
+export async function recordTokenUsage(
+  userId: string,
+  actualTokens: number,
+  // Kept for symmetry/observability; the budget is a single shared pool.
+  _source: TokenSource
+): Promise<number> {
+  const tokens = Math.max(0, Math.round(actualTokens));
+  if (tokens === 0) {
+    const plan = await getUserPlan(userId);
+    return plan.tokensUsed;
+  }
 
   for (let attempt = 0; attempt < MAX_COUNTER_ATTEMPTS; attempt += 1) {
     const userPlan = await getUserPlan(userId);
-    const limit = userPlan.effectiveLimit.reviews;
-
-    if (userPlan.reviewsUsed >= limit) {
-      return {
-        allowed: false,
-        reason: `Monthly review limit reached for the ${userPlan.effectiveLimit.label} plan.`,
-      };
-    }
-
-    const nextValue =
-      source === 'pr'
-        ? userPlan.prReviewsThisMonth + 1
-        : userPlan.mcpReviewsThisMonth + 1;
+    const nextValue = userPlan.tokensUsedThisMonth + tokens;
 
     const supabase = await getSupabaseAdmin();
     const { data, error } = (await supabase
       .from('users')
-      .update({ [counterField]: nextValue })
+      .update({ tokens_used_this_month: nextValue })
       .eq('id', userId)
-      .eq('pr_reviews_this_month', userPlan.prReviewsThisMonth)
-      .eq('mcp_reviews_this_month', userPlan.mcpReviewsThisMonth)
+      .eq('tokens_used_this_month', userPlan.tokensUsedThisMonth)
       .select('id')
       .maybeSingle()) as unknown as {
       data: { id: string } | null;
@@ -198,17 +218,14 @@ export async function checkReviewLimit(
     };
 
     if (error) {
-      throw new Error(`Failed to reserve review usage: ${error.message}`);
+      throw new Error(`Failed to record token usage: ${error.message}`);
     }
     if (data) {
-      return { allowed: true };
+      return nextValue;
     }
   }
 
-  return {
-    allowed: false,
-    reason: 'Review usage changed while this request was being processed. Please retry.',
-  };
+  throw new Error('Token usage changed concurrently while recording. Increment not applied.');
 }
 
 export async function checkRepoLimit(userId: string): Promise<LimitResult> {
@@ -223,6 +240,18 @@ export async function checkRepoLimit(userId: string): Promise<LimitResult> {
   }
 
   return { allowed: true };
+}
+
+/**
+ * True when the account currently has MORE connected repos than its plan
+ * allows (e.g. after a downgrade). Used at analysis time to skip reviews for
+ * accounts that are over their repo cap, distinct from {@link checkRepoLimit}
+ * which gates connecting one more repo.
+ */
+export async function isOverRepoLimit(userId: string): Promise<boolean> {
+  const userPlan = await getUserPlan(userId);
+  const limit = userPlan.effectiveLimit.repos;
+  return limit !== -1 && userPlan.reposConnected > limit;
 }
 
 export async function syncReposConnected(userId: string): Promise<number> {

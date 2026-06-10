@@ -16,7 +16,10 @@ type PrJoinRow = {
   base_sha: string;
   repositories: {
     full_name: string;
-    installations: { github_installation_id: number } | null;
+    installations: {
+      github_installation_id: number;
+      installed_by_user_id: string | null;
+    } | null;
   } | null;
 };
 
@@ -85,13 +88,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const { data: prRow } = await supabaseAdmin
       .from('pull_requests')
       .select(
-        'github_pr_number, head_sha, base_sha, repositories(full_name, installations(github_installation_id))'
+        'github_pr_number, head_sha, base_sha, repositories(full_name, installations(github_installation_id, installed_by_user_id))'
       )
       .eq('id', analysis.pull_request_id)
       .single();
 
     const pr = prRow as unknown as PrJoinRow | null;
-    if (!pr || !pr.repositories || !pr.repositories.installations) {
+    if (
+      !pr ||
+      !pr.repositories ||
+      !pr.repositories.installations ||
+      !pr.repositories.installations.installed_by_user_id
+    ) {
       skipped++;
       continue;
     }
@@ -101,6 +109,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     await enqueue('analyze-pr', {
       analysisId: analysis.id,
       pullRequestId: analysis.pull_request_id,
+      userId: pr.repositories.installations.installed_by_user_id,
       installationId: pr.repositories.installations.github_installation_id,
       owner,
       repo: repoName,
