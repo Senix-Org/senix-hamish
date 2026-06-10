@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, CreditCard, Loader2, Sparkles, X, Zap } from 'lucide-react';
+
+const BILLING_PERIOD_KEY = 'senix-billing-period';
 
 export type BillingPlanName = 'free' | 'starter' | 'team' | 'pro';
 export type BillingPlanStatus = 'active' | 'trialing' | 'cancelled' | 'past_due';
@@ -67,8 +69,34 @@ export function BillingClient({ planData, tiers }: Props): React.ReactElement {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Plan-comparison billing period. UI-only state, defaults to monthly.
+  // Plan-comparison billing period. Defaults to monthly, then hydrates from
+  // localStorage on mount so the choice survives navigation and refreshes.
+  // (Read in an effect, not in the initial state, to avoid an SSR/hydration
+  // mismatch.)
   const [period, setPeriod] = useState<BillingPeriod>('monthly');
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(BILLING_PERIOD_KEY);
+      if (stored === 'monthly' || stored === 'yearly') {
+        // Hydrating a persisted UI preference on mount. A lazy useState
+        // initializer can't read localStorage without an SSR mismatch.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setPeriod(stored);
+      }
+    } catch {
+      // localStorage can be unavailable (private mode); fall back to default.
+    }
+  }, []);
+
+  function changePeriod(next: BillingPeriod): void {
+    setPeriod(next);
+    try {
+      window.localStorage.setItem(BILLING_PERIOD_KEY, next);
+    } catch {
+      // Ignore persistence failures; the in-memory state still updates.
+    }
+  }
 
   const currentTier = tiers.find((tier) => tier.plan === currentPlanData.plan) ?? tiers[0];
   const nextTier = getNextTier(currentPlanData.plan, tiers);
@@ -241,7 +269,7 @@ export function BillingClient({ planData, tiers }: Props): React.ReactElement {
       <section className="mt-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold text-primary">Compare plans</h2>
-          <PeriodToggle period={period} onChange={setPeriod} />
+          <PeriodToggle period={period} onChange={changePeriod} />
         </div>
         <div className="mt-4 flex snap-x gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0 lg:grid-cols-4">
           {tiers.map((tier) => (

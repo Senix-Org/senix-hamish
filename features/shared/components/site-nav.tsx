@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import SignInButton from './sign-in-button';
+import { DesktopAuthCta } from './auth-cta';
 import { MobileMenu } from './site-nav-mobile';
 import { StickyHeader } from './sticky-header';
 
@@ -67,10 +67,5 @@ export function SiteNav({ rightSlot }: SiteNavProps = {}): React.ReactElement {
 }
 
 function PublicAuthCluster(): React.ReactElement {
-  return (
-    <>
-      <SignInButton label="Sign in" variant="text" />
-      <SignInButton label="Get started" variant="primary" />
-    </>
-  );
+  return <DesktopAuthCta />;
 }

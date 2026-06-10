@@ -11,6 +11,7 @@ import { SiteNav } from '@features/shared/components/site-nav';
 import { SiteFooter } from '@features/shared/components/site-footer';
 import { Reveal, RevealItem, RevealStagger } from '@features/shared/components/reveal';
 import SignInButton from '@features/shared/components/sign-in-button';
+import { HeroAuthCta } from '@features/shared/components/auth-cta';
 import { buildMetadata } from '@/lib/seo';
 import { JsonLd, landingSchemas } from '@/components/json-ld';
 
@@ -157,7 +158,7 @@ function Hero(): React.ReactElement {
         </Reveal>
         <Reveal delay={0.18}>
           <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <SignInButton label="Get started free" variant="hero" />
+            <HeroAuthCta />
             <Link
               href="#how-it-works"
               className="inline-flex items-center justify-center px-5 py-3 rounded-md border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/50 text-zinc-200 font-medium text-sm transition"
