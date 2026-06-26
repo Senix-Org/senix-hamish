@@ -534,7 +534,9 @@ function TestStep({ token }: { token: string | null }): React.ReactElement {
     setState('testing');
     setMessage(null);
     try {
-      const res = await fetch(`/api/mcp/test?token=${encodeURIComponent(token)}`);
+      const res = await fetch('/api/mcp/test', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const data = (await res.json()) as TestResponse;
       if (data.status === 'connected') {
         setState('connected');
