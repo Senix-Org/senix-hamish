@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@features/shared/supabase';
 import { formatShippingBrief, runAnalysis } from '@features/ai-engine/analyze-changes';
 import { checkTokenLimit, recordTokenUsage } from '@features/billing/plan-limits';
+import { checkMcpRateLimit } from '@features/billing/mcp-rate-limit';
 import { getAppBaseUrl } from '@features/shared/mcp-config';
 import { postMcpReviewToGithub } from '@features/github-integration/post-mcp-review';
 
@@ -96,6 +97,10 @@ const PROTOCOL_VERSION = '2025-06-18';
 const SUPPORTED_PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const SERVER_INFO = { name: 'senix', version: '1.0.0' };
 
+/** Natural-language instructions shown to the user by compliant MCP clients. */
+const SERVER_INSTRUCTIONS =
+  'Senix reviews code changes for production risk. Ask your AI assistant to "review my changes with Senix" before committing. Provide before/after file contents for each changed file. You\'ll get a shipping brief with a risk level, risky files with line ranges, and verification steps.';
+
 // Canonical tool name plus the legacy alias kept for older IDE configs.
 const TOOL_NAME = 'review_changes';
 const TOOL_ALIAS = 'analyze_code_changes';
@@ -156,6 +161,7 @@ const INVALID_REQUEST = -32600;
 const METHOD_NOT_FOUND = -32601;
 const INTERNAL_ERROR = -32603;
 const MONTHLY_LIMIT_REACHED = -32000;
+const RATE_LIMIT_REACHED = -32001;
 
 type JsonRpcId = string | number | null;
 
@@ -308,6 +314,7 @@ async function handleRpc(rpc: JsonRpcRequest, token: McpTokenRow): Promise<RpcOu
         protocolVersion: negotiated,
         capabilities: { tools: {} },
         serverInfo: SERVER_INFO,
+        instructions: SERVER_INSTRUCTIONS,
       });
     }
 
@@ -322,6 +329,19 @@ async function handleRpc(rpc: JsonRpcRequest, token: McpTokenRow): Promise<RpcOu
       }
       const args = (rpc.params?.arguments ?? {}) as Record<string, unknown>;
       try {
+        // Per-user short-window rate limit (defence-in-depth on top of the
+        // monthly token budget). Prevents a runaway IDE from burning cost
+        // before the monthly cap catches up.
+        const rateLimit = await checkMcpRateLimit(token.user_id);
+        if (!rateLimit.allowed) {
+          const retryAfter = Math.ceil(rateLimit.resetsAt - Date.now() / 1000);
+          return rpcError(
+            id,
+            RATE_LIMIT_REACHED,
+            `Rate limit: too many requests. Try again in ${Math.max(1, retryAfter)} seconds.`
+          );
+        }
+
         const limit = await checkTokenLimit(token.user_id, ESTIMATED_TOKENS_PER_REVIEW, 'mcp');
         if (!limit.allowed) {
           return rpcError(
@@ -441,6 +461,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
  * periodic keep-alive comments until the client disconnects. A plain
  * browser or health check (no event-stream Accept) gets a small
  * discovery descriptor instead.
+ *
+ * The SSE channel is authenticated with the same Bearer token as POST,
+ * so an unauthenticated client cannot hold a connection open.
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const protocolVersion = negotiateProtocolVersion(req);
@@ -456,6 +479,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       },
       { headers: { 'MCP-Protocol-Version': protocolVersion } }
     );
+  }
+
+  const token = await verifyToken(req);
+  if (!token) {
+    return new NextResponse(null, {
+      status: 401,
+      headers: { 'MCP-Protocol-Version': protocolVersion },
+    });
   }
 
   const encoder = new TextEncoder();
@@ -488,5 +519,19 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       Connection: 'keep-alive',
       'MCP-Protocol-Version': protocolVersion,
     },
+  });
+}
+
+/**
+ * DELETE terminates a session. Senix is stateless (no Mcp-Session-Id),
+ * so there is no server-side session to clean up. We respond 200 OK so
+ * spec-compliant clients that send DELETE on disconnect do not receive
+ * an error.
+ */
+export async function DELETE(req: NextRequest): Promise<NextResponse> {
+  const protocolVersion = negotiateProtocolVersion(req);
+  return new NextResponse(null, {
+    status: 200,
+    headers: { 'MCP-Protocol-Version': protocolVersion },
   });
 }
