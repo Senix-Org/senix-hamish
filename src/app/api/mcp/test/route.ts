@@ -13,11 +13,15 @@ const CONNECTED_WINDOW_MS = 5 * 60 * 1000;
 type TestStatus = 'connected' | 'token_valid' | 'invalid';
 
 /**
- * GET /api/mcp/test?token=sk_mcp_...
+ * GET /api/mcp/test
+ * Authorization: Bearer sk_mcp_...
  *
  * Connectivity check for the Connect IDE flow's "Test connection" button.
- * Unlike a bare token-exists check, this reports whether the IDE has
- * actually reached the MCP endpoint recently:
+ * The token is sent via the Authorization header (not the query string)
+ * to avoid leaking it in server logs, browser history, or referrer
+ * headers.
+ *
+ * Reports whether the IDE has actually reached the MCP endpoint recently:
  *   - `invalid`      — token is missing, unknown, or revoked.
  *   - `token_valid`  — token works but the IDE has never called, or last
  *                      called more than five minutes ago.
@@ -25,7 +29,6 @@ type TestStatus = 'connected' | 'token_valid' | 'invalid';
  * Does no analysis and burns no LLM cost. Responses are never cached.
  */
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const token = req.nextUrl.searchParams.get('token')?.trim();
   const noStore = { headers: { 'Cache-Control': 'no-store' } };
 
   const body = (status: TestStatus, extra: Record<string, unknown> = {}) => ({
@@ -33,6 +36,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     connected: status === 'connected',
     ...extra,
   });
+
+  // Read the token from the Authorization header instead of the URL.
+  const authHeader = req.headers.get('authorization') ?? '';
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  const token = match?.[1]?.trim();
 
   if (!token) {
     return NextResponse.json(body('invalid', { error: 'Missing token.' }), {
@@ -82,7 +90,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       lastUsedAt: data.last_used_at,
       message: data.last_used_at
         ? 'Token valid, but no IDE activity in the last 5 minutes.'
-        : 'Token valid, but no IDE has connected with it yet.',
+        : 'Token valid, but no IDE has connected yet. Restart your IDE and try again.',
     }),
     { status: 200, ...noStore }
   );
