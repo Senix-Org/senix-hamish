@@ -24,6 +24,8 @@
     "@supabase/supabase-js": "^2.105.1",
     "@upstash/redis": "^1.37.0",
     "@vercel/functions": "^3.5.1",
+    "@whop/checkout": "^0.1.0",
+    "@whop/sdk": "^0.0.40",
     "framer-motion": "^12.38.0",
     "groq-sdk": "^1.1.2",
     "lucide-react": "^1.14.0",
