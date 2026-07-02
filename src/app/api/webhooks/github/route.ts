@@ -6,7 +6,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
    export const runtime = 'nodejs';
    export const dynamic = 'force-dynamic';
-   
+   // The PR analysis now runs in an after() callback dispatched from this
+   // route, so the analysis time is bounded by this route's maxDuration
+   // (not the internal analyze-pr route). Give it 5 minutes to match.
+   export const maxDuration = 300;
+
    export async function POST(req: NextRequest) {
      const rawBody = await req.text();
      const signature = req.headers.get('x-hub-signature-256');

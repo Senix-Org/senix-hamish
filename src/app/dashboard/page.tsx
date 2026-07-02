@@ -29,6 +29,8 @@ type AnalysisRow = {
   summary: string | null;
   risk_level: string | null;
   created_at: string;
+  completed_at: string | null;
+  error_message: string | null;
   github_comment_url: string | null;
   pull_requests: {
     github_pr_number: number;
@@ -65,7 +67,8 @@ export default async function DashboardPage({
     supabase
       .from('analyses')
       .select(
-        'id, status, summary, risk_level, created_at, github_comment_url, ' +
+        'id, status, summary, risk_level, created_at, completed_at, error_message, ' +
+          'github_comment_url, ' +
           'pull_requests(github_pr_number, title, repositories(full_name))'
       )
       .order('created_at', { ascending: false })
@@ -114,6 +117,8 @@ export default async function DashboardPage({
     risk_level: a.risk_level,
     status: a.status,
     created_at: a.created_at,
+    completed_at: a.completed_at,
+    error_message: a.error_message,
     github_comment_url: a.github_comment_url,
     pr_title: a.pull_requests?.title ?? '(untitled PR)',
     pr_number: a.pull_requests?.github_pr_number ?? null,

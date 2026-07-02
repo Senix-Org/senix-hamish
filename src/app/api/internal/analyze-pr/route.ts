@@ -4,7 +4,13 @@ import type { JobPayloadMap } from '@features/review-queue/queue';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+// 5 minutes. DeepSeek calls on large diffs routinely run past the 60s
+// default and were being killed with 504 FUNCTION_INVOCATION_TIMEOUT,
+// leaving analysis rows stuck at status = 'running'. 300 is the Vercel
+// Pro ceiling without Fluid Compute; on Hobby the max is 60 and this
+// value is silently clamped, so the plan must be Pro (or Fluid Compute
+// enabled) for this to take effect.
+export const maxDuration = 300;
 
 type AnalyzePrPayload = JobPayloadMap['analyze-pr'];
 

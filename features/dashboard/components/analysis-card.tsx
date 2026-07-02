@@ -17,12 +17,22 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   failed: { label: 'Failed', className: 'text-risk-high bg-risk-high/10' },
 };
 
+const FAILED_BADGE = { label: 'Review Failed', className: 'text-risk-high bg-risk-high/10' };
+
+// A review still marked `running` with no completion this long after it was
+// created is treated as failed. This catches rows that died before the
+// timeout fix could record a status (the analyze-pr function used to be
+// killed at 60s, leaving the row spinning forever).
+const STALE_AFTER_MS = 10 * 60 * 1000;
+
 export type AnalysisCardData = {
   id: string;
   summary: string | null;
   risk_level: string | null;
   status: string | null;
   created_at: string;
+  completed_at: string | null;
+  error_message: string | null;
   github_comment_url: string | null;
   pr_title: string;
   pr_number: number | null;
@@ -41,8 +51,22 @@ export function AnalysisCard({ analysis }: { analysis: AnalysisCardData }): Reac
   const riskLabel = analysis.risk_level ? analysis.risk_level : 'unknown';
   const riskBadgeClass =
     (analysis.risk_level && RISK_BADGE[analysis.risk_level]) ?? 'text-muted bg-surface-raised';
-  const status = analysis.status ? STATUS_BADGE[analysis.status] : undefined;
   const created = new Date(analysis.created_at);
+  // Reading the clock to detect a stuck-running row. The card re-renders on
+  // Realtime updates and router refreshes, so any drift self-corrects; the
+  // status/error text is marked suppressHydrationWarning to absorb the rare
+  // server/client boundary crossing.
+  const now = Date.now(); // eslint-disable-line react-hooks/purity
+  const stale =
+    analysis.status === 'running' &&
+    !analysis.completed_at &&
+    now - created.getTime() > STALE_AFTER_MS;
+  const failed = analysis.status === 'failed' || stale;
+  const status = failed
+    ? FAILED_BADGE
+    : analysis.status
+      ? STATUS_BADGE[analysis.status]
+      : undefined;
 
   return (
     <div className="group relative rounded-xl border border-surface-border bg-surface p-6 transition-all duration-150 hover:border-neutral-border hover:bg-surface-raised">
@@ -57,6 +81,7 @@ export function AnalysisCard({ analysis }: { analysis: AnalysisCardData }): Reac
         <div className="absolute right-0 top-0 flex items-center gap-2">
           {status && (
             <span
+              suppressHydrationWarning
               className={`rounded-full px-2.5 py-1 text-xs font-medium uppercase tracking-wider ${status.className}`}
             >
               {status.label}
@@ -81,8 +106,17 @@ export function AnalysisCard({ analysis }: { analysis: AnalysisCardData }): Reac
           </h3>
         </div>
 
-        {summary && (
-          <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-secondary">{summary}</p>
+        {failed ? (
+          <p
+            suppressHydrationWarning
+            className="mt-2 line-clamp-2 text-sm leading-relaxed text-risk-high"
+          >
+            {analysis.error_message ?? 'This review did not complete. Please try again.'}
+          </p>
+        ) : (
+          summary && (
+            <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-secondary">{summary}</p>
+          )
         )}
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

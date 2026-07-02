@@ -200,6 +200,28 @@ export async function processAnalyzePr(
       })
       .eq('id', analysisId);
     throw err;
+  } finally {
+    // Safety net: if the row somehow slipped through still marked 'running'
+    // (e.g. the completed/failed update above itself failed, or the function
+    // was killed between writes), mark it failed so it never stays stuck on
+    // a spinner forever.
+    const { data: finalRow } = await supabaseAdmin
+      .from('analyses')
+      .select('status')
+      .eq('id', analysisId)
+      .maybeSingle();
+    const current = (finalRow ?? null) as unknown as { status: string | null } | null;
+
+    if (current?.status === 'running') {
+      await supabaseAdmin
+        .from('analyses')
+        .update({
+          status: 'failed',
+          completed_at: new Date().toISOString(),
+          error_message: 'Analysis did not complete',
+        })
+        .eq('id', analysisId);
+    }
   }
 }
 

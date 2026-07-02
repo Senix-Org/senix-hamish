@@ -1,6 +1,7 @@
-import { waitUntil } from '@vercel/functions';
+import { after } from 'next/server';
 import { supabaseAdmin } from '@features/shared/supabase';
 import { enqueue, type JobPayloadMap } from '@features/review-queue/queue';
+import { processAnalyzePr } from '@features/review-queue/worker/analyze-pr';
 import { checkTokenLimit } from '@features/billing/plan-limits';
 import { upsertPRComment } from '@features/github-integration/github-comments';
 import { getAppBaseUrl } from '@features/shared/mcp-config';
@@ -148,7 +149,7 @@ export async function handlePullRequest(payload: PullRequestPayload): Promise<st
     baseSha: pr.base.sha,
   };
 
-  const dispatchOutcome = await dispatchAnalyzePr(jobPayload);
+  const dispatchOutcome = dispatchAnalyzePr(jobPayload);
 
   return `pull_request:${action}:${repo.full_name}#${pr.number}:${dispatchOutcome}`;
 }
@@ -190,69 +191,45 @@ async function postLimitReachedComment(input: {
   }
 }
 
-type DispatchOutcome =
-  | 'serverless-dispatched'
-  | `queued:${string}`
-  | 'dispatch-failed';
+type DispatchOutcome = 'after-dispatched';
 
 /**
- * Trigger the analysis. Wraps the fetch in Vercel's waitUntil so the
- * serverless function stays alive until the dispatch settles, even after
- * the webhook handler returns 200 to GitHub.
+ * Schedule the analysis to run after the webhook responds 200 to GitHub.
  *
- * If the fetch fails, fall back to the Redis queue so the polling worker
- * can still recover the job.
+ * Next.js `after()` runs the callback once the response has been sent, so
+ * GitHub gets its fast acknowledgement while the analysis runs in the
+ * background under this route's maxDuration. We call `processAnalyzePr`
+ * directly instead of POSTing to the internal analyze-pr route: removing
+ * the internal HTTP hop removes a failure point and lets the webhook
+ * route's maxDuration govern the analysis time.
+ *
+ * `processAnalyzePr` records its own success/failure on the analysis row
+ * (including a finally-block safety net), so a thrown error here is already
+ * reflected in the DB. As a last-resort recovery for infrastructure faults
+ * (e.g. the row was never claimed), we enqueue to Redis so the standalone
+ * polling worker can still pick the job up.
  */
-async function dispatchAnalyzePr(
-  payload: JobPayloadMap['analyze-pr']
-): Promise<DispatchOutcome> {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-  const secret = process.env.INTERNAL_WORKER_SECRET;
-
-  if (siteUrl && secret) {
+function dispatchAnalyzePr(payload: JobPayloadMap['analyze-pr']): DispatchOutcome {
+  after(async () => {
     try {
-      waitUntil(
-        fetch(`${siteUrl}/api/internal/analyze-pr`, {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            'x-senix-internal-secret': secret,
-          },
-          body: JSON.stringify(payload),
-        }).catch((err) => {
-          console.error('[pull-request] analyze-pr dispatch failed', {
-            analysisId: payload.analysisId,
-            message: err?.message ?? String(err),
-          });
-          // Fallback: enqueue to Redis so the worker can pick it up
-          return enqueue('analyze-pr', payload);
-        })
-      );
-
-      return 'serverless-dispatched';
+      await processAnalyzePr(payload);
     } catch (err: unknown) {
-      console.error('[pull-request] failed to initiate analyze-pr fetch', {
+      console.error('[pull-request] background analyze-pr run failed', {
         analysisId: payload.analysisId,
         message: errorMessage(err),
       });
-      // fall through to Redis fallback
+      try {
+        await enqueue('analyze-pr', payload);
+      } catch (enqueueErr: unknown) {
+        console.error('[pull-request] Redis fallback enqueue failed', {
+          analysisId: payload.analysisId,
+          message: errorMessage(enqueueErr),
+        });
+      }
     }
-  } else {
-    console.warn(
-      '[pull-request] NEXT_PUBLIC_SITE_URL or INTERNAL_WORKER_SECRET missing; falling back to Redis queue'
-    );
-  }
+  });
 
-  try {
-    const jobId = await enqueue('analyze-pr', payload);
-    return `queued:${jobId}`;
-  } catch (err: unknown) {
-    console.error('[pull-request] Redis fallback enqueue failed', {
-      analysisId: payload.analysisId,
-      message: errorMessage(err),
-    });
-    return 'dispatch-failed';
-  }
+  return 'after-dispatched';
 }
 
 function errorMessage(err: unknown): string {
