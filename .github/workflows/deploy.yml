@@ -10,6 +10,30 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  # NEXT_PUBLIC_* values are inlined into the bundle at build time, so they
+  # must be present here (the build runs in Actions, not in Cloudflare).
+  # Set these as repository secrets. The placeholder fallbacks keep PR build
+  # checks green before the secrets exist; the guard step below refuses to
+  # deploy with placeholders.
+  NEXT_PUBLIC_APP_URL: https://senix.dev
+  NEXT_PUBLIC_SITE_URL: https://senix.dev
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+  NEXT_PUBLIC_GITHUB_APP_SLUG: ${{ secrets.NEXT_PUBLIC_GITHUB_APP_SLUG || 'senix' }}
+  NEXT_PUBLIC_WHOP_APP_ID: ${{ secrets.NEXT_PUBLIC_WHOP_APP_ID || 'app_placeholder' }}
+  # Build-time placeholders only. `next build` evaluates route modules while
+  # collecting page data, and these clients validate their config at module
+  # scope. Nothing executes against them during the build (every data route
+  # is force-dynamic), and at runtime the Worker reads the real values from
+  # its Cloudflare secrets, which take precedence. Do NOT put real server
+  # secrets here.
+  SUPABASE_URL: https://placeholder.supabase.co
+  SUPABASE_SERVICE_ROLE_KEY: placeholder-build-only
+  WHOP_API_KEY: placeholder-build-only
+  WHOP_WEBHOOK_SECRET: placeholder-build-only
+  WHOP_COMPANY_ID: biz_placeholder
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -33,6 +57,15 @@ jobs:
       - name: Build (PR check only)
         if: github.event_name == 'pull_request'
         run: npx opennextjs-cloudflare build
+
+      - name: Refuse to deploy with placeholder build vars
+        if: github.event_name == 'push'
+        run: |
+          if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" ] || [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" ]; then
+            echo "NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY repo secrets are not set."
+            echo "Deploying now would inline placeholder values into the client bundle. Aborting."
+            exit 1
+          fi
 
       - name: Build and deploy
         if: github.event_name == 'push'
