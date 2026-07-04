@@ -31,8 +31,10 @@ const h = vi.hoisted(() => ({
 
 const { unwrap, planForWhopPlanId, planForWhopProductId, pending, updates, userRow } = h;
 
-vi.mock('@vercel/functions', () => ({
-  waitUntil: (p: Promise<unknown>) => {
+// The route defers fulfillment with next/server's after(). Mock it to capture
+// the background promise so tests can flush it and assert on the effects.
+vi.mock('next/server', () => ({
+  after: (p: Promise<unknown>) => {
     h.pending.push(p);
   },
 }));

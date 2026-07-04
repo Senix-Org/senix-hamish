@@ -4,11 +4,11 @@ Senix is a GitHub App that posts AI-generated risk/behavior summaries on pull re
 
 ## Stack
 
-Next.js (App Router) on Vercel serverless · Supabase (Postgres + RLS + auth) · Upstash Redis (queue, kept as fallback) · DeepSeek (primary LLM, with Groq/Gemini/Anthropic providers) · tree-sitter (structural diff).
+Next.js (App Router) on Cloudflare Workers via @opennextjs/cloudflare · Supabase (Postgres + RLS + auth) · Upstash Redis (queue, kept as fallback) · DeepSeek (primary LLM, with Groq/Gemini/Anthropic providers) · tree-sitter (structural diff; native addon, so no symbol detail in the Workers runtime).
 
 ## Architecture
 
-GitHub webhook → `/api/webhooks/github` → `handlePullRequest` upserts PR + analysis rows → fire-and-forget POST to `/api/internal/analyze-pr` (Vercel serverless, `maxDuration=60`) → fetches diff, builds structural diff, calls LLM, updates Supabase, posts/updates PR comment. The standalone Node worker (`worker/`) polls Redis and is an optional fallback only.
+GitHub webhook → `/api/webhooks/github` → `handlePullRequest` upserts PR + analysis rows → analysis dispatched via `after()` (runs after the 200 response; Workers bills CPU time only, so long LLM waits are fine) → fetches diff, builds structural diff, calls LLM, updates Supabase, posts/updates PR comment. The standalone Node worker (`worker/`) polls Redis and is an optional fallback only. Builds and deploys go through GitHub Actions (`.github/workflows/deploy.yml`); OpenNext builds are unreliable on Windows, so do not deploy locally.
 
 ## Key files
 

@@ -6,10 +6,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
    export const runtime = 'nodejs';
    export const dynamic = 'force-dynamic';
-   // The PR analysis now runs in an after() callback dispatched from this
-   // route, so the analysis time is bounded by this route's maxDuration
-   // (not the internal analyze-pr route). Give it 5 minutes to match.
-   export const maxDuration = 300;
+   // The PR analysis runs in an after() callback dispatched from this route.
+   // On Cloudflare Workers there is no wall-clock cap (billing is CPU time),
+   // so no maxDuration is needed; the LLM wait costs almost no CPU.
 
    export async function POST(req: NextRequest) {
      const rawBody = await req.text();

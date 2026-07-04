@@ -21,14 +21,26 @@ export type TokenBudgetResult = {
   used: number;
 };
 
-/** Best-effort client IP from the proxy headers Vercel sets. */
+/**
+ * Client IP for rate limiting. CF-Connecting-IP is set by Cloudflare itself
+ * on every request that traverses its edge and cannot be spoofed by the
+ * caller, so it is authoritative. x-real-ip and x-forwarded-for are
+ * best-effort fallbacks for local dev and non-Cloudflare deployments only;
+ * x-forwarded-for is client-controllable and is deliberately last.
+ */
 export function clientIp(req: NextRequest): string {
+  const cfIp = req.headers.get('cf-connecting-ip')?.trim();
+  if (cfIp) return cfIp;
+
+  const realIp = req.headers.get('x-real-ip')?.trim();
+  if (realIp) return realIp;
+
   const forwarded = req.headers.get('x-forwarded-for');
   if (forwarded) {
     const first = forwarded.split(',')[0]?.trim();
     if (first) return first;
   }
-  return req.headers.get('x-real-ip')?.trim() || 'unknown';
+  return 'unknown';
 }
 
 /** ISO timestamp truncated to the start of the current UTC day (24h window). */

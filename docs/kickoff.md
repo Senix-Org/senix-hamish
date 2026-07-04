@@ -4,7 +4,7 @@
    
    ## Project
    - **Name:** Senix
-   - **Live URL:** https://senix-chi.vercel.app
+   - **Live URL:** https://senix.dev
    - **Repo:** https://github.com/Senix-Org/senix.git
    
    ## Stack

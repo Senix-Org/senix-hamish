@@ -1,0 +1,31 @@
+// Cloudflare Workers configuration for Senix (OpenNext adapter).
+//
+// No secrets belong in this file. All runtime secrets (API keys, DB URLs,
+// webhook secrets) are set in the Cloudflare dashboard:
+// Workers & Pages -> senix -> Settings -> Variables and Secrets.
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"main": ".open-next/worker.js",
+	"name": "senix",
+	// Must be 2024-09-23 or later for Node.js APIs; 2024-12-30 per current docs.
+	"compatibility_date": "2024-12-30",
+	"compatibility_flags": [
+		"nodejs_compat",
+		"global_fetch_strictly_public"
+	],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"services": [
+		{
+			// Self-reference service binding; the service name must match the
+			// worker name (see https://opennext.js.org/cloudflare/caching).
+			"binding": "WORKER_SELF_REFERENCE",
+			"service": "senix"
+		}
+	],
+	"observability": {
+		"enabled": true
+	}
+}

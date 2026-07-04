@@ -1,22 +1,22 @@
 # Deploying Senix
 
-Senix runs primarily as **Vercel serverless functions**. The standalone Node worker in `worker/` is now an **optional fallback** — production does not need a 24/7 process.
+Senix runs primarily on **Cloudflare Workers** (see `docs/cloudflare-deploy.md` for the full deploy guide). The standalone Node worker in `worker/` is now an **optional fallback** — production does not need a 24/7 process.
 
 ## How the pipeline runs today
 
-1. GitHub webhook hits `POST /api/webhooks/github` on Vercel.
+1. GitHub webhook hits `POST /api/webhooks/github` on the Worker.
 2. The webhook handler upserts the PR + analysis rows in Supabase.
-3. It fires a non-awaited `POST` to `/api/internal/analyze-pr`, protected by the `x-senix-internal-secret` header.
+3. It dispatches the analysis in an `after()` callback (runs after the response is sent).
 4. The webhook returns `200` to GitHub within milliseconds.
-5. The `/api/internal/analyze-pr` function fetches the diff, builds the structural diff, calls the LLM, posts the PR comment, and updates Supabase. `maxDuration` is set to 60s.
+5. The analysis fetches the diff, builds the structural diff, calls the LLM, posts the PR comment, and updates Supabase. There is no wall-clock timeout on Workers; billing is CPU time only.
 
 If the synchronous dispatch fails (missing `NEXT_PUBLIC_SITE_URL` / `INTERNAL_WORKER_SECRET`, or `fetch` throws), the handler falls back to enqueuing on Upstash Redis. The standalone worker (if running) picks the job up on its next poll.
 
-## Required env vars on Vercel
+## Required env vars (Cloudflare Worker secrets)
 
 In addition to the existing Supabase / GitHub App / LLM keys:
 
-- `NEXT_PUBLIC_SITE_URL` — e.g. `https://senix.vercel.app`
+- `NEXT_PUBLIC_SITE_URL` — e.g. `https://senix.dev`
 - `INTERNAL_WORKER_SECRET` — random hex; generate with `openssl rand -hex 32`
 - `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` — still required so the Redis fallback path stays available
 
@@ -24,7 +24,7 @@ In addition to the existing Supabase / GitHub App / LLM keys:
 
 You only need to deploy `worker/` if:
 
-- You're worried about Vercel's `maxDuration` cap for unusually large PRs.
+- You want full tree-sitter symbol detail in the structural diff (the Workers runtime cannot load the native parser; the Node worker can).
 - You want a belt-and-suspenders setup where Redis is the source of truth.
 - You're running Senix on infrastructure that doesn't support serverless fan-out.
 
@@ -129,4 +129,4 @@ docker run -d --name senix-worker --restart=unless-stopped --env-file .env senix
 - **`missing required env var`** at startup: the env file isn't mounted or a key is blank. `docker run --env-file` requires `KEY=value` lines, no quotes around the value.
 - **No heartbeats** after 60s: check `docker logs senix-worker` for an early crash; `validateEnv` will have logged which key was missing before exit.
 - **`installation uninstalled`** in logs: a tester removed the GitHub App. The worker correctly skips the job and marks the analysis row as completed with that note.
-- **Webhook dispatched but analysis never ran**: check Vercel logs for `/api/internal/analyze-pr`. If you see 401s, `INTERNAL_WORKER_SECRET` doesn't match between the webhook and the analyze route. If you see nothing at all, `NEXT_PUBLIC_SITE_URL` is probably unset — the handler will have fallen back to Redis; check the queue or boot the worker.
+- **Webhook dispatched but analysis never ran**: check the Worker logs (Cloudflare dashboard, Workers & Pages, senix, Logs) for `/api/internal/analyze-pr`. If you see 401s, `INTERNAL_WORKER_SECRET` doesn't match between the webhook and the analyze route. If you see nothing at all, `NEXT_PUBLIC_SITE_URL` is probably unset — the handler will have fallen back to Redis; check the queue or boot the worker.

@@ -1,7 +1,5 @@
 import { ImageResponse } from 'next/og';
 
-export const runtime = 'edge';
-
 /**
  * Dynamic Open Graph image (1200x630) used as the default social card for
  * every page. Generated with next/og so it always reflects current

@@ -1,4 +1,4 @@
-import { waitUntil } from '@vercel/functions';
+import { after } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type WhopNamespace from '@whop/sdk';
 import { whopsdk } from '@/lib/whop-sdk';
@@ -28,9 +28,11 @@ type AppUserRow = {
  * happens. The authenticated payload's `metadata.user_id` (which we stamped on
  * the checkout configuration in /api/checkout) is the only identity we act on.
  *
- * We verify synchronously, then do fulfillment in the background via waitUntil
- * and return 200 fast, per Whop's guidance. Whop retries non-2xx and timeouts,
- * so handleWebhookEvent is idempotent (keyed on the webhook event id).
+ * We verify synchronously, then do fulfillment in the background via Next's
+ * after() (runs once the response is sent; on Cloudflare, OpenNext backs it
+ * with the platform waitUntil) and return 200 fast, per Whop's guidance. Whop
+ * retries non-2xx and timeouts, so handleWebhookEvent is idempotent (keyed on
+ * the webhook event id).
  */
 export async function POST(request: NextRequest): Promise<Response> {
   const requestBodyText = await request.text();
@@ -48,7 +50,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     return new Response('Invalid signature', { status: 401 });
   }
 
-  waitUntil(handleWebhookEvent(webhookData));
+  after(handleWebhookEvent(webhookData));
 
   return new Response('OK', { status: 200 });
 }

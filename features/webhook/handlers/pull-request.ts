@@ -128,9 +128,10 @@ export async function handlePullRequest(payload: PullRequestPayload): Promise<st
 
   // Step 3: Dispatch the analysis job.
   //
-  // Default path: fire-and-forget POST to the internal serverless route.
-  // Vercel keeps the function alive after the webhook returns 200, so the
-  // analysis runs without GitHub waiting on it.
+  // Default path: run the analysis in an after() callback. The runtime
+  // (Cloudflare Workers via waitUntil under OpenNext) keeps the invocation
+  // alive after the webhook returns 200, so the analysis runs without
+  // GitHub waiting on it.
   //
   // Fallback path: if the dispatch fails synchronously (bad URL, missing
   // secret) we push to the Redis queue so the standalone polling worker

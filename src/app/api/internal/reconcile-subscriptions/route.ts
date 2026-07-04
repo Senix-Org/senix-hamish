@@ -6,7 +6,6 @@ import type { PlanName, PlanStatus } from '@features/billing/plan-limits';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
 
 type AppUserRow = {
   id: string;
@@ -24,8 +23,9 @@ type ReconcileResult = {
 
 /**
  * Authorize the caller. Two accepted forms:
- * - Vercel Cron sends `Authorization: Bearer <CRON_SECRET>` when CRON_SECRET is
- *   set on the project. This is the production trigger.
+ * - The scheduled GitHub Actions workflow (.github/workflows/cron-reconcile.yml)
+ *   sends `Authorization: Bearer <CRON_SECRET>` when CRON_SECRET is set.
+ *   This is the production trigger.
  * - Basic auth against INTERNAL_PASSWORD, matching the other /api/internal/*
  *   routes, for manual runs.
  * When neither secret is configured we allow the request (local/dev).
