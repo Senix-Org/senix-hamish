@@ -12,7 +12,7 @@
  * deployments work without code changes, falling back to the hosted app.
  */
 
-const FALLBACK_BASE_URL = 'https://senix-chi.vercel.app';
+const FALLBACK_BASE_URL = 'https://senix.dev';
 const TOKEN_PLACEHOLDER = 'YOUR_TOKEN_HERE';
 
 /** Base app URL with any trailing slash stripped. */
@@ -21,7 +21,7 @@ export function getAppBaseUrl(): string {
   return (raw && raw.replace(/\/+$/, '')) || FALLBACK_BASE_URL;
 }
 
-/** Full MCP endpoint, e.g. https://senix-chi.vercel.app/api/mcp */
+/** Full MCP endpoint, e.g. https://senix.dev/api/mcp */
 export function getMcpServerUrl(): string {
   return `${getAppBaseUrl()}/api/mcp`;
 }

@@ -1,0 +1,75 @@
+name: Deploy to Cloudflare Workers
+
+# Deploys on every push to main and runs the same build as a check on every
+# PR into main. All real builds happen here on Linux; OpenNext has known
+# Windows build issues, so local Windows builds are not the deploy path.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  # NEXT_PUBLIC_* values are inlined into the bundle at build time, so they
+  # must be present here (the build runs in Actions, not in Cloudflare).
+  # Set these as repository secrets. The placeholder fallbacks keep PR build
+  # checks green before the secrets exist; the guard step below refuses to
+  # deploy with placeholders.
+  NEXT_PUBLIC_APP_URL: https://senix.dev
+  NEXT_PUBLIC_SITE_URL: https://senix.dev
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
+  NEXT_PUBLIC_GITHUB_APP_SLUG: ${{ secrets.NEXT_PUBLIC_GITHUB_APP_SLUG || 'senix' }}
+  NEXT_PUBLIC_WHOP_APP_ID: ${{ secrets.NEXT_PUBLIC_WHOP_APP_ID || 'app_placeholder' }}
+  # Build-time placeholders only. `next build` evaluates route modules while
+  # collecting page data, and these clients validate their config at module
+  # scope. Nothing executes against them during the build (every data route
+  # is force-dynamic), and at runtime the Worker reads the real values from
+  # its Cloudflare secrets, which take precedence. Do NOT put real server
+  # secrets here.
+  SUPABASE_URL: https://placeholder.supabase.co
+  SUPABASE_SERVICE_ROLE_KEY: placeholder-build-only
+  WHOP_API_KEY: placeholder-build-only
+  WHOP_WEBHOOK_SECRET: placeholder-build-only
+  WHOP_COMPANY_ID: biz_placeholder
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build (PR check only)
+        if: github.event_name == 'pull_request'
+        run: npx opennextjs-cloudflare build
+
+      - name: Refuse to deploy with placeholder build vars
+        if: github.event_name == 'push'
+        run: |
+          if [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" ] || [ -z "${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" ]; then
+            echo "NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY repo secrets are not set."
+            echo "Deploying now would inline placeholder values into the client bundle. Aborting."
+            exit 1
+          fi
+
+      - name: Build and deploy
+        if: github.event_name == 'push'
+        run: npm run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

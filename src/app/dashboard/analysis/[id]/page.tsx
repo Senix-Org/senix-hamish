@@ -47,6 +47,7 @@ type AnalysisDetail = {
   commit_sha: string | null;
   created_at: string;
   completed_at: string | null;
+  error_message: string | null;
   summary: string | null;
   risk_level: string | null;
   focus_areas: FocusArea[] | null;
@@ -81,7 +82,7 @@ export default async function AnalysisDetailPage({
   const { data } = (await supabase
     .from('analyses')
     .select(
-      'id, status, commit_sha, created_at, completed_at, summary, risk_level, ' +
+      'id, status, commit_sha, created_at, completed_at, error_message, summary, risk_level, ' +
         'focus_areas, risk_flags, tokens_used, cost_usd_cents, github_comment_url, ' +
         'pull_requests(github_pr_number, title, author_login, head_sha, repositories(full_name))'
     )
@@ -99,6 +100,17 @@ export default async function AnalysisDetailPage({
   const detectedRisks = flags.detected_risks ?? [];
   const focusAreas = data.focus_areas ?? [];
   const structural = flags.structural_diff ?? [];
+  // A run still marked `running` with no completion long after it started is
+  // treated as failed, so this page never shows an endless spinner for jobs
+  // that died before a status could be recorded.
+  // Server Component rendered once per request, so reading the clock here is
+  // deterministic for this render (same pattern as the dashboard overview).
+  const nowMs = Date.now(); // eslint-disable-line react-hooks/purity
+  const stale =
+    data.status === 'running' &&
+    !data.completed_at &&
+    nowMs - new Date(data.created_at).getTime() > 10 * 60 * 1000;
+  const failed = data.status === 'failed' || stale;
   const riskTone =
     (data.risk_level && RISK_TONE[data.risk_level]) ??
     'text-muted bg-surface-raised border-surface-border';
@@ -151,7 +163,7 @@ export default async function AnalysisDetailPage({
 
           {/* Status row */}
           <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-surface-border pt-4">
-            <StatusPill status={data.status} />
+            <StatusPill status={failed ? 'failed' : data.status} label={failed ? 'Review Failed' : undefined} />
             {data.risk_level && (
               <span
                 className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${riskTone}`}
@@ -166,6 +178,19 @@ export default async function AnalysisDetailPage({
           </div>
         </header>
       </Reveal>
+
+      {/* Failed notice */}
+      {failed && (
+        <Reveal delay={0.06}>
+          <section className="rounded-xl border border-risk-high/30 bg-risk-high/10 p-6">
+            <h2 className="text-sm font-semibold text-risk-high">Review failed</h2>
+            <p className="mt-1 text-sm leading-relaxed text-secondary">
+              {data.error_message ??
+                'This review did not complete. Open a new commit on the pull request to retry.'}
+            </p>
+          </section>
+        </Reveal>
+      )}
 
       {/* Behavioral summary */}
       {data.summary && (
@@ -289,7 +314,7 @@ function SectionLabel({
   );
 }
 
-function StatusPill({ status }: { status: string }): React.ReactElement {
+function StatusPill({ status, label }: { status: string; label?: string }): React.ReactElement {
   const tone =
     status === 'completed'
       ? 'text-risk-low bg-risk-low/10 border-risk-low/30'
@@ -302,7 +327,7 @@ function StatusPill({ status }: { status: string }): React.ReactElement {
     <span
       className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${tone}`}
     >
-      {status}
+      {label ?? status}
     </span>
   );
 }

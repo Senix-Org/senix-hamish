@@ -11,7 +11,6 @@ import { checkTokenLimit, recordTokenUsage } from '@features/billing/plan-limits
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
 
 /**
  * POST /api/playground/review

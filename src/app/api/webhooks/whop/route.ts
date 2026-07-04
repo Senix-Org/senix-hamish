@@ -1,6 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after } from 'next/server';
+import type { NextRequest } from 'next/server';
+import type WhopNamespace from '@whop/sdk';
+import { whopsdk } from '@/lib/whop-sdk';
+
+type UnwrapWebhookEvent = WhopNamespace.UnwrapWebhookEvent;
 import { supabaseAdmin } from '@features/shared/supabase';
-import { planForWhopPlanId, planForWhopProductId, verifyWhopSignature } from '@features/billing/whop';
+import { planForWhopPlanId, planForWhopProductId } from '@features/billing/whop';
 import type { PlanName, PlanStatus } from '@features/billing/plan-limits';
 
 export const runtime = 'nodejs';
@@ -14,95 +19,116 @@ type AppUserRow = {
   whop_membership_id: string | null;
 };
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
-  const rawBody = await req.text();
-  const signature = req.headers.get('x-whop-signature');
+/**
+ * Whop webhook entry point.
+ *
+ * Security model: we never trust anything in the request except the bytes,
+ * which `whopsdk.webhooks.unwrap` verifies against the signing secret. A forged
+ * or tampered body fails verification and is rejected with 401 before any work
+ * happens. The authenticated payload's `metadata.user_id` (which we stamped on
+ * the checkout configuration in /api/checkout) is the only identity we act on.
+ *
+ * We verify synchronously, then do fulfillment in the background via Next's
+ * after() (runs once the response is sent; on Cloudflare, OpenNext backs it
+ * with the platform waitUntil) and return 200 fast, per Whop's guidance. Whop
+ * retries non-2xx and timeouts, so handleWebhookEvent is idempotent (keyed on
+ * the webhook event id).
+ */
+export async function POST(request: NextRequest): Promise<Response> {
+  const requestBodyText = await request.text();
+  const headers = Object.fromEntries(request.headers);
 
-  if (!verifyWhopSignature(rawBody, signature)) {
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-  }
-
-  let payload: unknown;
+  let webhookData: UnwrapWebhookEvent;
   try {
-    payload = JSON.parse(rawBody);
+    // Throws on a bad/forged signature. We surface that as a non-2xx rather
+    // than swallowing it and returning 200.
+    webhookData = whopsdk.webhooks.unwrap(requestBodyText, { headers });
   } catch (err) {
-    console.error('[whop webhook] invalid JSON', err);
-    return NextResponse.json({ ok: true });
+    console.error('[whop webhook] signature verification failed', {
+      message: err instanceof Error ? err.message : String(err),
+    });
+    return new Response('Invalid signature', { status: 401 });
   }
 
-  const eventType = extractEventType(payload);
-  console.log('[whop webhook] received', {
-    eventType,
-    eventId: extractEventId(payload),
-    membershipId: extractMembershipId(payload),
+  after(handleWebhookEvent(webhookData));
+
+  return new Response('OK', { status: 200 });
+}
+
+export async function GET(): Promise<Response> {
+  return new Response(JSON.stringify({ status: 'ready' }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
   });
+}
+
+async function handleWebhookEvent(event: UnwrapWebhookEvent): Promise<void> {
+  logWebhookPayload(event);
+
+  // Idempotency: Whop retries deliveries, so a given event id may arrive more
+  // than once. Skip anything we have already processed.
+  if (await alreadyProcessed(event.id)) {
+    console.log('[whop webhook] duplicate event ignored', { eventId: event.id, type: event.type });
+    return;
+  }
 
   try {
-    switch (eventType) {
-      case 'membership_activated':
-        await handleMembershipActivated(payload);
+    switch (event.type) {
+      case 'membership.activated':
+        await handleMembershipActivated(event);
         break;
-      case 'membership_deactivated':
-        await handleMembershipDeactivated(payload);
+      case 'membership.deactivated':
+        await handleMembershipDeactivated(event);
         break;
-      case 'payment_succeeded':
-      case 'invoice_paid':
-        await handlePaymentSucceeded(payload);
+      case 'payment.succeeded':
+        await handlePaymentSucceeded(event);
+        break;
+      case 'payment.failed':
+        await handlePaymentFailed(event);
         break;
       default:
-        console.log('[whop webhook] ignored event', { eventType });
+        console.log('[whop webhook] ignored event', { type: event.type, eventId: event.id });
         break;
     }
   } catch (err) {
+    // Do not record the event as processed if handling threw, so Whop's retry
+    // (or the reconciliation job) gets another chance.
     console.error('[whop webhook] processing failed', {
-      eventType,
+      type: event.type,
+      eventId: event.id,
       message: err instanceof Error ? err.message : String(err),
     });
+    return;
   }
 
-  return NextResponse.json({ ok: true });
+  await markProcessed(event.id, event.type);
 }
 
-export async function GET(): Promise<NextResponse> {
-  return NextResponse.json({ status: 'ready' });
-}
+// --- Event handlers ---------------------------------------------------------
 
-async function handleMembershipActivated(payload: unknown): Promise<void> {
-  const email = extractEmail(payload);
-  const productId = extractProductId(payload);
-  const planId = extractPlanId(payload);
-  const membershipId = extractMembershipId(payload);
-  const eventId = extractEventId(payload);
-  // Prefer mapping by the specific plan ID (per period); fall back to the
-  // product ID for older configurations.
-  const plan = planForWhopPlanId(planId) ?? planForWhopProductId(productId);
+async function handleMembershipActivated(
+  event: Extract<UnwrapWebhookEvent, { type: 'membership.activated' }>
+): Promise<void> {
+  const membership = event.data;
+  const plan =
+    planForWhopPlanId(membership.plan?.id) ?? planForWhopProductId(membership.product?.id);
 
-  console.log('[whop webhook] membership_activated', {
-    email,
-    productId,
-    planId,
-    plan,
-    membershipId,
+  const user = await resolveUser({
+    userId: readMetadataUserId(membership.metadata),
+    membershipId: membership.id,
+    email: membership.user?.email ?? null,
   });
 
-  if (!email || !plan || !membershipId) {
-    console.warn('[whop webhook] missing activation fields', { email, productId, membershipId });
+  if (!user || !plan) {
+    console.warn('[whop webhook] activation could not be applied', {
+      eventId: event.id,
+      resolvedUser: user?.id ?? null,
+      plan,
+    });
     return;
   }
 
-  const { data: user } = (await supabaseAdmin
-    .from('users')
-    .select('id, email, plan, plan_status, whop_membership_id')
-    .eq('email', email)
-    .maybeSingle()) as unknown as { data: AppUserRow | null };
-
-  if (!user) {
-    console.warn('[whop webhook] no user found for activation email', { email });
-    return;
-  }
-
-  const trialEndsAt = extractTrialEndsAt(payload);
-  const isTrial = Boolean(trialEndsAt && new Date(trialEndsAt).getTime() > Date.now());
+  const isTrial = membership.status === 'trialing';
   const nextStatus: PlanStatus = isTrial ? 'trialing' : 'active';
 
   const { error } = await supabaseAdmin
@@ -110,8 +136,9 @@ async function handleMembershipActivated(payload: unknown): Promise<void> {
     .update({
       plan,
       plan_status: nextStatus,
-      trial_ends_at: trialEndsAt,
-      whop_membership_id: membershipId,
+      whop_membership_id: membership.id,
+      plan_expires_at: unixToIso(membership.renewal_period_end),
+      trial_ends_at: isTrial ? unixToIso(membership.renewal_period_end) : null,
     })
     .eq('id', user.id);
 
@@ -124,29 +151,22 @@ async function handleMembershipActivated(payload: unknown): Promise<void> {
     eventType: isTrial ? 'trial_started' : 'upgraded',
     fromPlan: user.plan,
     toPlan: plan,
-    whopEventId: eventId,
+    whopEventId: event.id,
   });
 }
 
-async function handleMembershipDeactivated(payload: unknown): Promise<void> {
-  const membershipId = extractMembershipId(payload);
-  const eventId = extractEventId(payload);
-
-  console.log('[whop webhook] membership_deactivated', { membershipId });
-
-  if (!membershipId) {
-    console.warn('[whop webhook] missing deactivated membership id');
-    return;
-  }
-
-  const { data: user } = (await supabaseAdmin
-    .from('users')
-    .select('id, email, plan, plan_status, whop_membership_id')
-    .eq('whop_membership_id', membershipId)
-    .maybeSingle()) as unknown as { data: AppUserRow | null };
+async function handleMembershipDeactivated(
+  event: Extract<UnwrapWebhookEvent, { type: 'membership.deactivated' }>
+): Promise<void> {
+  const membership = event.data;
+  const user = await resolveUser({
+    userId: readMetadataUserId(membership.metadata),
+    membershipId: membership.id,
+    email: membership.user?.email ?? null,
+  });
 
   if (!user) {
-    console.warn('[whop webhook] no user found for deactivated membership', { membershipId });
+    console.warn('[whop webhook] deactivation could not be applied', { eventId: event.id });
     return;
   }
 
@@ -170,43 +190,41 @@ async function handleMembershipDeactivated(payload: unknown): Promise<void> {
     eventType: 'cancelled',
     fromPlan: user.plan,
     toPlan: 'free',
-    whopEventId: eventId,
+    whopEventId: event.id,
   });
 }
 
-async function handlePaymentSucceeded(payload: unknown): Promise<void> {
-  const membershipId = extractMembershipId(payload);
-  const eventId = extractEventId(payload);
-
-  console.log('[whop webhook] payment succeeded', { membershipId, eventId });
-
-  if (!membershipId) {
-    console.warn('[whop webhook] missing payment membership id');
-    return;
-  }
-
-  const { data: user } = (await supabaseAdmin
-    .from('users')
-    .select('id, email, plan, plan_status, whop_membership_id')
-    .eq('whop_membership_id', membershipId)
-    .maybeSingle()) as unknown as { data: AppUserRow | null };
+async function handlePaymentSucceeded(
+  event: Extract<UnwrapWebhookEvent, { type: 'payment.succeeded' }>
+): Promise<void> {
+  const payment = event.data;
+  const user = await resolveUser({
+    userId: readMetadataUserId(payment.metadata),
+    membershipId: payment.membership?.id ?? null,
+    email: null,
+  });
 
   if (!user) {
-    console.warn('[whop webhook] no user found for payment membership', { membershipId });
+    console.warn('[whop webhook] payment.succeeded could not be applied', { eventId: event.id });
     return;
   }
 
+  // First payment may arrive before/with membership.activated; map the plan
+  // when we can so access turns on regardless of event ordering.
+  const mappedPlan = planForWhopPlanId(payment.plan?.id) ?? planForWhopProductId(payment.product?.id);
   const wasPastDue = user.plan_status === 'past_due';
-  const { error } = await supabaseAdmin
-    .from('users')
-    .update({
-      plan_status: 'active',
-      trial_ends_at: null,
-    })
-    .eq('id', user.id);
 
+  const update: Record<string, unknown> = { plan_status: 'active', trial_ends_at: null };
+  if (mappedPlan && user.plan === 'free') {
+    update.plan = mappedPlan;
+  }
+  if (payment.membership?.id && !user.whop_membership_id) {
+    update.whop_membership_id = payment.membership.id;
+  }
+
+  const { error } = await supabaseAdmin.from('users').update(update).eq('id', user.id);
   if (error) {
-    throw new Error(`Failed to update payment status: ${error.message}`);
+    throw new Error(`Failed to apply payment.succeeded: ${error.message}`);
   }
 
   if (wasPastDue) {
@@ -214,11 +232,115 @@ async function handlePaymentSucceeded(payload: unknown): Promise<void> {
       userId: user.id,
       eventType: 'reactivated',
       fromPlan: user.plan,
-      toPlan: user.plan,
-      whopEventId: eventId,
+      toPlan: (update.plan as string) ?? user.plan,
+      whopEventId: event.id,
     });
   }
 }
+
+async function handlePaymentFailed(
+  event: Extract<UnwrapWebhookEvent, { type: 'payment.failed' }>
+): Promise<void> {
+  const payment = event.data;
+  const user = await resolveUser({
+    userId: readMetadataUserId(payment.metadata),
+    membershipId: payment.membership?.id ?? null,
+    email: null,
+  });
+
+  if (!user) {
+    console.warn('[whop webhook] payment.failed could not be applied', { eventId: event.id });
+    return;
+  }
+
+  const { error } = await supabaseAdmin
+    .from('users')
+    .update({ plan_status: 'past_due' })
+    .eq('id', user.id);
+
+  if (error) {
+    throw new Error(`Failed to apply payment.failed: ${error.message}`);
+  }
+
+  await insertPlanEvent({
+    userId: user.id,
+    eventType: 'payment_failed',
+    fromPlan: user.plan,
+    toPlan: user.plan,
+    whopEventId: event.id,
+  });
+}
+
+// --- Identity resolution ----------------------------------------------------
+
+/**
+ * Resolve the application user this event belongs to. The verified
+ * `metadata.user_id` is authoritative. The membership id and email are
+ * defense-in-depth fallbacks for legacy memberships created before metadata
+ * stamping, never a substitute when metadata is present.
+ */
+async function resolveUser(input: {
+  userId: string | null;
+  membershipId: string | null;
+  email: string | null;
+}): Promise<AppUserRow | null> {
+  if (input.userId) {
+    const byId = await findUser('id', input.userId);
+    if (byId) return byId;
+    console.warn('[whop webhook] metadata.user_id did not match a user row', {
+      userId: input.userId,
+    });
+  }
+  if (input.membershipId) {
+    const byMembership = await findUser('whop_membership_id', input.membershipId);
+    if (byMembership) return byMembership;
+  }
+  if (input.email) {
+    return findUser('email', input.email);
+  }
+  return null;
+}
+
+async function findUser(column: 'id' | 'whop_membership_id' | 'email', value: string) {
+  const { data } = (await supabaseAdmin
+    .from('users')
+    .select('id, email, plan, plan_status, whop_membership_id')
+    .eq(column, value)
+    .maybeSingle()) as unknown as { data: AppUserRow | null };
+  return data;
+}
+
+function readMetadataUserId(metadata: { [key: string]: unknown } | null | undefined): string | null {
+  const value = metadata?.user_id;
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+// --- Idempotency ------------------------------------------------------------
+
+async function alreadyProcessed(eventId: string): Promise<boolean> {
+  const { data } = (await supabaseAdmin
+    .from('processed_webhook_events')
+    .select('event_id')
+    .eq('event_id', eventId)
+    .maybeSingle()) as unknown as { data: { event_id: string } | null };
+  return Boolean(data);
+}
+
+async function markProcessed(eventId: string, eventType: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('processed_webhook_events')
+    .insert({ event_id: eventId, event_type: eventType });
+  // A unique-violation here means a concurrent delivery already claimed it,
+  // which is fine; anything else is worth surfacing.
+  if (error && !/duplicate key|unique/i.test(error.message)) {
+    console.error('[whop webhook] failed to record processed event', {
+      eventId,
+      message: error.message,
+    });
+  }
+}
+
+// --- Helpers ----------------------------------------------------------------
 
 async function insertPlanEvent(input: {
   userId: string;
@@ -250,105 +372,42 @@ async function insertPlanEvent(input: {
   }
 }
 
-function extractEventType(payload: unknown): string {
-  const raw =
-    readString(payload, ['type']) ??
-    readString(payload, ['event']) ??
-    readString(payload, ['event_type']) ??
-    readString(payload, ['data', 'type']) ??
-    'unknown';
-
-  return raw.replace(/[.-]/g, '_');
+/** Convert a Whop Unix timestamp (seconds, as string or number) to ISO. */
+function unixToIso(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  const seconds = typeof value === 'string' ? Number(value) : value;
+  if (!Number.isFinite(seconds)) return null;
+  return new Date(seconds * 1000).toISOString();
 }
 
-function extractEventId(payload: unknown): string | null {
-  return (
-    readString(payload, ['id']) ??
-    readString(payload, ['event_id']) ??
-    readString(payload, ['data', 'id']) ??
-    null
-  );
+/**
+ * Log a redacted snapshot of the event. Used to confirm, against a real test
+ * delivery, exactly where metadata.user_id lands (see the metadata line). PII
+ * and card data are masked; structure and metadata are preserved.
+ */
+function logWebhookPayload(event: UnwrapWebhookEvent): void {
+  const metadata =
+    'metadata' in event.data ? (event.data as { metadata?: unknown }).metadata : undefined;
+  console.log('[whop webhook] received', {
+    type: event.type,
+    eventId: event.id,
+    dataId: (event.data as { id?: string }).id ?? null,
+    metadata,
+    redactedPayload: JSON.stringify(event, redactSecrets),
+  });
 }
 
-function extractEmail(payload: unknown): string | null {
-  return (
-    readString(payload, ['email']) ??
-    readString(payload, ['user', 'email']) ??
-    readString(payload, ['customer', 'email']) ??
-    readString(payload, ['data', 'email']) ??
-    readString(payload, ['data', 'user', 'email']) ??
-    readString(payload, ['data', 'customer', 'email']) ??
-    readString(payload, ['data', 'membership', 'user', 'email']) ??
-    readString(payload, ['data', 'object', 'user', 'email']) ??
-    readString(payload, ['data', 'object', 'customer', 'email']) ??
-    null
-  );
-}
+const REDACTED_KEYS = new Set([
+  'email',
+  'license_key',
+  'card_last4',
+  'billing_address',
+  'phone_number',
+  'name',
+  'username',
+]);
 
-function extractProductId(payload: unknown): string | null {
-  return (
-    readString(payload, ['product_id']) ??
-    readString(payload, ['product', 'id']) ??
-    readString(payload, ['data', 'product_id']) ??
-    readString(payload, ['data', 'product', 'id']) ??
-    readString(payload, ['data', 'membership', 'product_id']) ??
-    readString(payload, ['data', 'membership', 'product', 'id']) ??
-    readString(payload, ['data', 'object', 'product_id']) ??
-    readString(payload, ['data', 'object', 'product', 'id']) ??
-    null
-  );
-}
-
-function extractPlanId(payload: unknown): string | null {
-  return (
-    readString(payload, ['plan_id']) ??
-    readString(payload, ['plan', 'id']) ??
-    readString(payload, ['data', 'plan_id']) ??
-    readString(payload, ['data', 'plan', 'id']) ??
-    readString(payload, ['data', 'membership', 'plan_id']) ??
-    readString(payload, ['data', 'membership', 'plan', 'id']) ??
-    readString(payload, ['data', 'object', 'plan_id']) ??
-    readString(payload, ['data', 'object', 'plan', 'id']) ??
-    null
-  );
-}
-
-function extractMembershipId(payload: unknown): string | null {
-  return (
-    readString(payload, ['membership_id']) ??
-    readString(payload, ['membership', 'id']) ??
-    readString(payload, ['data', 'membership_id']) ??
-    readString(payload, ['data', 'id']) ??
-    readString(payload, ['data', 'membership', 'id']) ??
-    readString(payload, ['data', 'object', 'membership_id']) ??
-    readString(payload, ['data', 'object', 'membership', 'id']) ??
-    readString(payload, ['data', 'object', 'id']) ??
-    null
-  );
-}
-
-function extractTrialEndsAt(payload: unknown): string | null {
-  return (
-    readString(payload, ['trial_ends_at']) ??
-    readString(payload, ['trial_end']) ??
-    readString(payload, ['trial_end_date']) ??
-    readString(payload, ['data', 'trial_ends_at']) ??
-    readString(payload, ['data', 'trial_end']) ??
-    readString(payload, ['data', 'membership', 'trial_ends_at']) ??
-    readString(payload, ['data', 'membership', 'trial_end']) ??
-    readString(payload, ['data', 'object', 'trial_ends_at']) ??
-    readString(payload, ['data', 'object', 'trial_end']) ??
-    null
-  );
-}
-
-function readString(payload: unknown, path: string[]): string | null {
-  const value = path.reduce<unknown>((current, key) => {
-    if (!current || typeof current !== 'object') return null;
-    return (current as Record<string, unknown>)[key];
-  }, payload);
-
-  if (typeof value === 'string' && value.length > 0) return value;
-  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
-  return null;
+function redactSecrets(key: string, value: unknown): unknown {
+  if (REDACTED_KEYS.has(key) && value) return '[redacted]';
+  return value;
 }

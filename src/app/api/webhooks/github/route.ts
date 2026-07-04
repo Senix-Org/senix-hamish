@@ -6,7 +6,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
    export const runtime = 'nodejs';
    export const dynamic = 'force-dynamic';
-   
+   // The PR analysis runs in an after() callback dispatched from this route.
+   // On Cloudflare Workers there is no wall-clock cap (billing is CPU time),
+   // so no maxDuration is needed; the LLM wait costs almost no CPU.
+
    export async function POST(req: NextRequest) {
      const rawBody = await req.text();
      const signature = req.headers.get('x-hub-signature-256');

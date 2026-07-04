@@ -201,7 +201,7 @@ ENFORCE RATE LIMITS IN EXISTING ROUTES
    - Call checkReviewLimit(userId, 'mcp')
    - If not allowed, return a JSON-RPC error response with code 
      -32000 and message: "Monthly review limit reached. Upgrade 
-     your plan at https://senix-chi.vercel.app/dashboard"
+     your plan at https://senix.dev/dashboard"
    - If allowed, proceed with the analysis
 
 2. In the GitHub webhook handler that processes PR reviews 
@@ -210,7 +210,7 @@ ENFORCE RATE LIMITS IN EXISTING ROUTES
    - Call checkReviewLimit(userId, 'pr')
    - If not allowed, post a comment on the PR saying:
      "Senix monthly review limit reached. Upgrade at 
-     https://senix-chi.vercel.app/dashboard to continue 
+     https://senix.dev/dashboard to continue 
      reviewing PRs."
    - If allowed, proceed with the analysis
 
@@ -219,7 +219,7 @@ ENFORCE RATE LIMITS IN EXISTING ROUTES
    - If not allowed, respond with an error or post an issue 
      comment saying:
      "Repo limit reached for your current plan. Upgrade at 
-     https://senix-chi.vercel.app/dashboard"
+     https://senix.dev/dashboard"
 
 DASHBOARD BILLING PAGE
 Create src/app/dashboard/billing/page.tsx.

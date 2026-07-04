@@ -1,0 +1,31 @@
+name: Daily subscription reconciliation
+
+# Replaces the Vercel cron that vercel.json used to define. Cloudflare cron
+# triggers invoke a Worker's scheduled() handler rather than an HTTP route,
+# so the simplest faithful replacement is a scheduled workflow that calls the
+# same internal route with the same Bearer CRON_SECRET header Vercel sent.
+# Requires the CRON_SECRET repository secret to match the value configured in
+# the Cloudflare Worker's secrets.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger reconciliation
+        run: |
+          status=$(curl -s -o /tmp/body -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            https://senix.dev/api/internal/reconcile-subscriptions)
+          cat /tmp/body
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "Reconciliation failed with HTTP $status"
+            exit 1
+          fi
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

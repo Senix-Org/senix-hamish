@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Check, CreditCard, Loader2, Sparkles, X, Zap } from 'lucide-react';
+import { WhopCheckoutDialog } from '@/components/whop-checkout-dialog';
 
 const BILLING_PERIOD_KEY = 'senix-billing-period';
 
@@ -109,33 +110,13 @@ export function BillingClient({ planData, tiers }: Props): React.ReactElement {
   const tokenProgressTone =
     tokenProgress >= 100 ? 'bg-risk-high' : tokenProgress >= 80 ? 'bg-amber-500' : 'bg-accent';
 
-  async function startCheckout(plan: BillingPlanName): Promise<void> {
-    setCheckoutBusy(plan);
+  function startCheckout(plan: BillingPlanName): void {
+    if (plan === 'free') return;
     setMessage(null);
     setError(null);
-
-    try {
-      const response = await fetch('/api/billing/checkout', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ plan, period }),
-      });
-
-      if (response.status === 401) {
-        window.location.assign('/login?next=/dashboard/billing');
-        return;
-      }
-
-      const payload = (await response.json()) as { checkoutUrl?: string; error?: string };
-      if (!response.ok || !payload.checkoutUrl) {
-        throw new Error(payload.error ?? 'Checkout could not be started.');
-      }
-
-      window.location.assign(payload.checkoutUrl);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setCheckoutBusy(null);
-    }
+    // Opens the embedded Whop checkout for this plan. The session is created
+    // server-side (tied to the signed-in user) inside the dialog.
+    setCheckoutBusy(plan);
   }
 
   async function cancelSubscription(): Promise<void> {
@@ -296,6 +277,15 @@ export function BillingClient({ planData, tiers }: Props): React.ReactElement {
         >
           {error ?? message}
         </div>
+      )}
+
+      {checkoutBusy && checkoutBusy !== 'free' && (
+        <WhopCheckoutDialog
+          plan={checkoutBusy}
+          period={period}
+          loginRedirect="/dashboard/billing"
+          onClose={() => setCheckoutBusy(null)}
+        />
       )}
 
       {confirmCancel && (

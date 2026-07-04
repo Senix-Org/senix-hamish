@@ -73,6 +73,14 @@
    - `signature_valid` (boolean)
    - `processed` (boolean, default false)
    - `received_at` (timestamptz, default `now()`)
+
+   ### processed_webhook_events
+   Idempotency ledger for Whop webhooks (migration 010). Whop retries deliveries
+   on timeout or non-2xx, so the handler records each processed event id here
+   and skips duplicates.
+   - `event_id` (text, primary key) — Whop webhook event id
+   - `event_type` (text) — e.g. `membership.activated`
+   - `processed_at` (timestamptz, default `now()`)
    
    ## Indexes
    - `installations(github_installation_id)`

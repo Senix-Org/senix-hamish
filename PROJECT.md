@@ -167,7 +167,7 @@ Important env vars referenced by code/docs:
 
 ## Deployment Notes
 
-- The web app is intended for Vercel.
+- The web app runs on Cloudflare Workers via @opennextjs/cloudflare.
 - The worker is intended as a long-running Docker process, documented in `docs/worker-deploy.md`.
 - The `Dockerfile` builds the worker container.
 - The GitHub App setup is documented in `docs/github-app-config.md`.

@@ -50,7 +50,7 @@ The GitHub App already has OAuth credentials we can reuse.
 
 ## 5. Set the public env vars
 
-Add to `.env.local` (and to Vercel's project env for prod):
+Add to `.env.local` (and to the Cloudflare Worker secrets for prod):
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://{project-ref}.supabase.co

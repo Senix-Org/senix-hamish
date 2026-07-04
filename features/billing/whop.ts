@@ -47,6 +47,19 @@ export function whopCheckoutUrlForPlanId(planId: string): string {
   return `https://whop.com/checkout/${encodeURIComponent(planId)}`;
 }
 
+/**
+ * Resolve the Whop plan ID a checkout should use for a paid plan. Prefers the
+ * period-specific pre-created plan ID (the secure SDK checkout path needs a
+ * concrete plan_id), and returns null when none is configured so the caller
+ * can surface a clear configuration error.
+ */
+export function resolveCheckoutPlanId(
+  plan: PaidPlanName,
+  period: BillingPeriod
+): string | null {
+  return whopPlanId(plan, period) ?? whopPlanId(plan, 'monthly');
+}
+
 export function whopProductIdForPlan(plan: PaidPlanName): string | null {
   switch (plan) {
     case 'starter':

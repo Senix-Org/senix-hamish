@@ -4,7 +4,8 @@ import type { JobPayloadMap } from '@features/review-queue/queue';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+// No maxDuration: Cloudflare Workers has no wall-clock cap on requests and
+// bills CPU time only, so long DeepSeek waits on large diffs are fine here.
 
 type AnalyzePrPayload = JobPayloadMap['analyze-pr'];
 

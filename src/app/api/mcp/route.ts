@@ -13,7 +13,6 @@ const ESTIMATED_TOKENS_PER_REVIEW = 2000;
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
 
 /**
  * MCP server for Senix.
