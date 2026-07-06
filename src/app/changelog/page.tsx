@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { SiteNav } from '@features/shared/components/site-nav';
-import { SiteFooter } from '@features/shared/components/site-footer';
+import { TraeFooterSection } from '@features/marketing/components/trae/footer-section';
 import { Reveal, RevealItem, RevealStagger } from '@features/shared/components/reveal';
 import { buildMetadata } from '@/lib/seo';
 
@@ -112,7 +112,7 @@ export default function ChangelogPage(): React.ReactElement {
           </RevealStagger>
         </section>
       </main>
-      <SiteFooter />
+      <TraeFooterSection />
     </>
   );
 }

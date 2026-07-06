@@ -9,6 +9,7 @@ type SignInVariant =
   | 'secondary'
   | 'text'
   | 'hero'
+  | 'trae'
   | 'mobile-primary'
   | 'mobile-secondary';
 
@@ -129,6 +130,9 @@ function containerClass(variant: SignInVariant): string {
   if (variant === 'hero') {
     return 'inline-flex flex-col items-center gap-2';
   }
+  if (variant === 'trae') {
+    return 'inline-flex flex-col items-center gap-2';
+  }
   return 'flex flex-col items-stretch gap-2';
 }
 
@@ -141,6 +145,8 @@ function buttonClass(variant: SignInVariant): string {
       return `${base} text-sm text-secondary hover:text-primary`;
     case 'hero':
       return `${base} btn-senix btn-senix-primary px-5 !h-auto py-3 text-sm`;
+    case 'trae':
+      return `${base} trae-btn trae-btn-brand inline-flex h-10 min-w-[96px] items-center justify-center rounded-md bg-[var(--trae-brand)] px-6 text-sm font-medium tracking-wide text-[#0a0b0d] hover:bg-[var(--trae-brand-hover)] xl:h-16 xl:px-7 xl:text-base`;
     case 'secondary':
       return `${base} btn-senix btn-senix-secondary px-4 !h-auto py-2.5 text-sm`;
     case 'mobile-primary':

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { createServerSupabaseClient } from '@features/shared/supabase-server';
 import { McpTokenManager, type McpTokenView } from '@features/dashboard/components/mcp-token-manager';
+import { DashboardPageHeader } from '@features/dashboard/components/page-header';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -37,16 +38,19 @@ export default async function TokensPage(): Promise<React.ReactElement> {
 
   return (
     <div>
-      <header>
-        <h1 className="text-3xl font-semibold text-primary">Tokens</h1>
-        <p className="mt-2 max-w-xl text-sm text-secondary">
-          Tokens let your IDE connect to Senix. Generate a token, then head to{' '}
-          <Link href="/dashboard/connect" className="text-accent hover:text-accent-hover">
-            Connect IDE
-          </Link>{' '}
-          for a ready-to-paste config snippet tailored to your editor.
-        </p>
-      </header>
+      <DashboardPageHeader
+        eyebrow="Integrations"
+        title="MCP tokens"
+        description={
+          <>
+            Tokens let your IDE connect to Senix. Generate a token, then head to{' '}
+            <Link href="/dashboard/connect" className="text-accent hover:text-accent-hover">
+              Connect IDE
+            </Link>{' '}
+            for a ready-to-paste config snippet.
+          </>
+        }
+      />
 
       <section className="mt-8">
         <McpTokenManager tokens={tokens} />

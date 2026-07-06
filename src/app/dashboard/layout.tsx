@@ -36,11 +36,12 @@ export default async function DashboardLayout({
 
   return (
     <ToastProvider>
-      <div className="senix-app min-h-screen bg-base text-primary">
+      <div className="senix-app relative min-h-screen bg-base text-primary">
+        <div className="pointer-events-none fixed inset-0 bg-hero-dots opacity-30" aria-hidden />
         <DashboardSidebar handle={handle} avatarUrl={meta.avatar_url} />
 
-        <div className="px-4 pb-8 pt-20 md:ml-16 md:p-8">
-          <main className="animate-fade-in mx-auto min-w-0 max-w-5xl">{children}</main>
+        <div className="relative px-4 pb-10 pt-20 md:ml-16 md:p-8 md:pb-12">
+          <main className="animate-fade-in mx-auto min-w-0 max-w-6xl">{children}</main>
         </div>
       </div>
     </ToastProvider>

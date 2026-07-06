@@ -1,0 +1,849 @@
+/* TRAE.ai design tokens — https://www.trae.ai/ */
+.trae-site {
+  --trae-bg: #0a0b0d;
+  --trae-bg-secondary: #121314;
+  --trae-brand: #32f08c;
+  --trae-brand-hover: #0fdc78;
+  --trae-brand-gradient: linear-gradient(
+    90deg,
+    #3ee1a3 0%,
+    #32f08c 36%,
+    #60f2bd 71.63%,
+    #a0fde7 100%
+  );
+  --trae-text: #f5f9fe;
+  --trae-text-secondary: #a6aab5;
+  --trae-text-tertiary: #787d87;
+  --trae-border: hsla(0, 0%, 100%, 0.18);
+  --trae-border-subtle: hsla(0, 0%, 100%, 0.12);
+  --trae-overlay: rgba(237, 239, 242, 0.08);
+  --trae-header-height: 64px;
+  --trae-max-width: 1600px;
+
+  background: var(--trae-bg);
+  color: var(--trae-text);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  position: relative;
+}
+
+.trae-site::before {
+  content: '';
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 180px 180px;
+}
+
+.trae-site .font-mono,
+.trae-site code,
+.trae-site pre {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+.trae-gradient-text {
+  background: var(--trae-brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.trae-section {
+  width: min(100%, var(--trae-max-width));
+  margin-inline: auto;
+  padding-inline: 16px;
+}
+
+@media (min-width: 744px) {
+  .trae-section {
+    padding-inline: 24px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .trae-section {
+    padding-inline: 32px;
+  }
+}
+
+.trae-section-label {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--trae-text-secondary);
+}
+
+.trae-section-title {
+  margin-top: 12px;
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--trae-text);
+}
+
+.trae-section-desc {
+  margin-top: 16px;
+  max-width: 640px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--trae-text-secondary);
+}
+
+.trae-card {
+  --beam-angle: 0deg;
+  --beam-opacity: 0;
+  position: relative;
+  border: 1px solid var(--trae-border-subtle);
+  border-radius: 2px;
+  background: var(--trae-bg-secondary);
+  transition:
+    border-color 0.25s,
+    transform 0.25s,
+    box-shadow 0.25s;
+}
+
+/* Border beam: uses CSS mask to show conic gradient ONLY in the 1px border ring */
+.trae-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--beam-angle),
+    transparent 0deg,
+    transparent 310deg,
+    rgba(50, 240, 140, 0.15) 330deg,
+    rgba(50, 240, 140, 0.65) 348deg,
+    rgba(160, 253, 231, 0.95) 355deg,
+    rgba(50, 240, 140, 0.65) 360deg
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: var(--beam-opacity);
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.trae-card:hover {
+  border-color: hsla(0, 0%, 100%, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px -12px rgba(50, 240, 140, 0.15);
+}
+
+.trae-bento {
+  display: grid;
+  gap: 12px;
+}
+
+@media (min-width: 744px) {
+  .trae-bento {
+    grid-template-columns: repeat(12, 1fr);
+    gap: 16px;
+  }
+}
+
+.trae-bento-span-7 {
+  grid-column: span 12;
+}
+
+@media (min-width: 744px) {
+  .trae-bento-span-7 {
+    grid-column: span 7;
+  }
+}
+
+.trae-bento-span-5 {
+  grid-column: span 12;
+}
+
+@media (min-width: 744px) {
+  .trae-bento-span-5 {
+    grid-column: span 5;
+  }
+}
+
+.trae-bento-span-4 {
+  grid-column: span 12;
+}
+
+@media (min-width: 744px) {
+  .trae-bento-span-4 {
+    grid-column: span 4;
+  }
+}
+
+.trae-bento-span-8 {
+  grid-column: span 12;
+}
+
+@media (min-width: 744px) {
+  .trae-bento-span-8 {
+    grid-column: span 8;
+  }
+}
+
+.trae-bento-span-6 {
+  grid-column: span 12;
+}
+
+@media (min-width: 744px) {
+  .trae-bento-span-6 {
+    grid-column: span 6;
+  }
+}
+
+.trae-divider {
+  height: 1px;
+  background: var(--trae-border);
+}
+
+.trae-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    transform 0.15s;
+}
+
+.trae-btn-brand {
+  background: var(--trae-brand);
+  color: #0a0b0d;
+}
+
+.trae-btn-brand:hover {
+  background: var(--trae-brand-hover);
+}
+
+.trae-btn-outline {
+  border: 1px solid #fff;
+  color: #f5f9fe;
+  background: transparent;
+}
+
+.trae-btn-outline:hover {
+  background: var(--trae-overlay);
+  color: #f5f9fe;
+}
+
+.trae-site a.trae-btn-outline,
+.trae-site .trae-btn-outline span {
+  color: #f5f9fe;
+}
+
+.trae-footer-wordmark-wrap {
+  overflow: visible;
+  position: relative;
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-top: 0;
+  padding-bottom: 0;
+  min-height: clamp(140px, 19vw, 320px);
+  line-height: 1;
+  user-select: none;
+  pointer-events: none;
+  perspective: 900px;
+  /* CodeRabbit-style: dark gradient pool the letters sit in */
+  background: linear-gradient(
+    to bottom,
+    rgba(10, 11, 13, 0) 0%,
+    rgba(6, 7, 8, 0.6) 40%,
+    rgba(4, 5, 6, 0.92) 75%,
+    #030404 100%
+  );
+}
+
+/* Top fade so wordmark emerges from the footer */
+.trae-footer-wordmark-wrap::before {
+  content: '';
+  position: absolute;
+  inset-x: 0;
+  top: 0;
+  height: 35%;
+  background: linear-gradient(to bottom, rgba(10,11,13,0.55) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Bottom solid seal — letters bleed right to the page edge */
+.trae-footer-wordmark-wrap::after {
+  content: '';
+  position: absolute;
+  inset-x: 0;
+  bottom: 0;
+  height: 30%;
+  background: #030404;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.trae-footer-wordmark {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 0 clamp(12px, 2vw, 24px);
+  font-size: clamp(88px, 18vw, 340px);
+  font-weight: 500;
+  letter-spacing: -0.028em;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1;
+  transform: none;
+}
+
+.trae-footer-wordmark-char {
+  display: inline-block;
+  color: transparent;
+  /* CodeRabbit-style: pure outlined stroke, no fill */
+  -webkit-text-stroke: 1.5px rgba(50, 240, 140, 0.45);
+  background: none;
+  will-change: transform, opacity;
+  transition: -webkit-text-stroke-color 0.3s;
+}
+
+.trae-footer-wordmark-char:hover {
+  -webkit-text-stroke-color: rgba(50, 240, 140, 0.85);
+}
+
+@media (min-width: 744px) {
+  .trae-footer-wordmark-wrap {
+    min-height: clamp(160px, 18vw, 360px);
+  }
+
+  .trae-footer-wordmark {
+    font-size: clamp(100px, 17vw, 380px);
+    letter-spacing: -0.026em;
+  }
+}
+
+@media (min-width: 1280px) {
+  .trae-footer-wordmark-wrap {
+    min-height: clamp(180px, 17vw, 400px);
+  }
+
+  .trae-footer-wordmark {
+    font-size: clamp(112px, 16.5vw, 420px);
+    letter-spacing: -0.024em;
+  }
+}
+
+.trae-final-cta-headline {
+  perspective: 900px;
+}
+
+.trae-final-cta-accent.trae-gradient-text {
+  background-size: 220% 100%;
+  background-position: 0% center;
+}
+
+.trae-hero-accent.trae-gradient-text {
+  background-size: 220% 100%;
+  background-position: 0% center;
+}
+
+.trae-privacy-accent.trae-gradient-text {
+  background-size: 220% 100%;
+  background-position: 0% center;
+}
+
+.trae-integrations-marquee {
+  overflow: hidden;
+  mask-image: linear-gradient(to right, transparent 0%, #000 6%, #000 94%, transparent 100%);
+}
+
+.trae-integrations-track {
+  display: flex;
+  width: max-content;
+  gap: 10px;
+  padding-inline: 10px;
+  animation: trae-integrations-marquee 32s linear infinite;
+  will-change: transform;
+}
+
+.trae-integrations-marquee:hover .trae-integrations-track {
+  animation-play-state: paused;
+}
+
+.trae-integration-pill {
+  transition:
+    border-color 0.2s,
+    color 0.2s,
+    box-shadow 0.2s;
+}
+
+.trae-integration-pill:hover {
+  border-color: rgba(50, 240, 140, 0.35);
+  color: var(--trae-text);
+  box-shadow: 0 0 20px -8px rgba(50, 240, 140, 0.3);
+}
+
+@keyframes trae-integrations-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.trae-compare-panel-dim {
+  background: linear-gradient(180deg, rgba(18, 19, 20, 0.95) 0%, rgba(10, 11, 13, 1) 100%);
+}
+
+.trae-compare-panel-lit {
+  background: linear-gradient(
+    145deg,
+    rgba(50, 240, 140, 0.06) 0%,
+    rgba(18, 19, 20, 0.98) 38%,
+    rgba(10, 11, 13, 1) 100%
+  );
+  border-color: rgba(50, 240, 140, 0.22);
+}
+
+.trae-compare-panel-lit::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(50, 240, 140, 0.5) 50%,
+    transparent 100%
+  );
+}
+
+.trae-compare-panel {
+  position: relative;
+}
+
+.trae-privacy-card:hover .trae-privacy-icon {
+  transform: translateY(-2px);
+}
+
+.trae-testimonials-section {
+  overflow: hidden;
+}
+
+.trae-testimonials-accent.trae-gradient-text {
+  background-size: 220% 100%;
+  background-position: 0% center;
+}
+
+.trae-testimonials-marquees {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.trae-testimonials-row {
+  overflow: hidden;
+  width: 100%;
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    #000 6%,
+    #000 94%,
+    transparent 100%
+  );
+}
+
+.trae-testimonials-track {
+  display: flex;
+  width: max-content;
+  gap: 12px;
+  animation: trae-testimonials-marquee 38s linear infinite;
+  will-change: transform;
+}
+
+.trae-testimonials-track-reverse {
+  animation-direction: reverse;
+}
+
+.trae-testimonials-row:hover .trae-testimonials-track {
+  animation-play-state: paused;
+}
+
+.trae-testimonial-card {
+  position: relative;
+  border-radius: 2px;
+  min-height: 196px;
+  overflow: hidden;
+}
+
+.trae-testimonial-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(50, 240, 140, 0.45) 35%,
+    rgba(160, 253, 231, 0.35) 65%,
+    transparent 100%
+  );
+  opacity: 0.85;
+}
+
+.trae-testimonial-avatar {
+  box-shadow: 0 0 16px -4px rgba(50, 240, 140, 0.25);
+}
+
+@keyframes trae-testimonials-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+/* ── CodeRabbit-style announcement banner ── */
+.trae-announcement-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 13px 5px 6px;
+  border-radius: 9999px;
+  border: 1px solid rgba(50, 240, 140, 0.2);
+  background: rgba(50, 240, 140, 0.05);
+  font-size: 13px;
+  color: var(--trae-text-secondary);
+  text-decoration: none;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
+  animation: trae-pill-pulse 4s ease-in-out infinite;
+}
+
+.trae-announcement-pill:hover {
+  border-color: rgba(50, 240, 140, 0.42);
+  background: rgba(50, 240, 140, 0.09);
+  color: var(--trae-text);
+}
+
+.trae-announcement-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0a0b0d;
+  background: var(--trae-brand);
+  padding: 2px 7px;
+  border-radius: 9999px;
+  line-height: 1.4;
+}
+
+@keyframes trae-pill-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(50, 240, 140, 0); }
+  50% { box-shadow: 0 0 18px -4px rgba(50, 240, 140, 0.22); }
+}
+
+/* ── CodeRabbit-style feature tabs ── */
+.trae-feature-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--trae-border-subtle);
+}
+
+.trae-feature-tab {
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--trae-text-tertiary);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  background: transparent;
+  transition:
+    color 0.2s,
+    border-color 0.2s;
+  white-space: nowrap;
+}
+
+.trae-feature-tab:hover {
+  color: var(--trae-text-secondary);
+}
+
+.trae-feature-tab[aria-selected='true'] {
+  color: var(--trae-text);
+  border-bottom-color: var(--trae-brand);
+}
+
+/* ── Gradient card border (CodeRabbit glowing card border) ── */
+.trae-card-gradient-border {
+  position: relative;
+}
+
+.trae-card-gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(50, 240, 140, 0.5) 0%,
+    transparent 40%,
+    transparent 60%,
+    rgba(160, 253, 231, 0.25) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.35s;
+  pointer-events: none;
+}
+
+.trae-card-gradient-border:hover::before {
+  opacity: 1;
+}
+
+/* ── Spotlight hover effect (CodeRabbit card radial glow) ── */
+.trae-spotlight {
+  position: relative;
+  overflow: hidden;
+}
+
+.trae-spotlight-inner {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    350px circle at var(--spotlight-x, 50%) var(--spotlight-y, 50%),
+    rgba(50, 240, 140, 0.065),
+    transparent 65%
+  );
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+
+.trae-spotlight:hover .trae-spotlight-inner {
+  opacity: 1;
+}
+
+/* ── CodeRabbit-style glowing separator ── */
+.trae-glow-separator {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(50, 240, 140, 0.45) 35%,
+    rgba(160, 253, 231, 0.35) 65%,
+    transparent 100%
+  );
+  margin-block: 0;
+}
+
+/* ── Leader stat row (CodeRabbit "6M repos, 75M defects" style) ── */
+.trae-leader-stat {
+  border-left: 1px solid var(--trae-border-subtle);
+  padding-left: 28px;
+}
+
+.trae-leader-stat:first-child {
+  border-left: none;
+  padding-left: 0;
+}
+
+.trae-leader-stat-number {
+  font-size: clamp(40px, 5.5vw, 72px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+/* ── Gradient section overlay (CodeRabbit section backgrounds) ── */
+.trae-section-glow-top::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 80% 50% at 50% -10%,
+    rgba(50, 240, 140, 0.08) 0%,
+    transparent 65%
+  );
+  pointer-events: none;
+}
+
+/* ── CodeRabbit-style numbered step row ── */
+.trae-step-line {
+  position: relative;
+}
+
+.trae-step-line::before {
+  content: '';
+  position: absolute;
+  top: 11px;
+  left: 11px;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(50, 240, 140, 0.35) 0%,
+    transparent 80%
+  );
+}
+
+/* ── Scan line shimmer (CodeRabbit animated highlight) ── */
+@keyframes trae-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(400%); }
+}
+
+.trae-shimmer-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.trae-shimmer-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 25%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  animation: trae-shimmer 3.5s ease-in-out infinite;
+  animation-delay: 1.5s;
+  pointer-events: none;
+}
+
+/* ── CodeRabbit page-top gradient mesh (blends from hero into page) ── */
+.trae-page-gradient {
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 800px;
+  background:
+    radial-gradient(ellipse 65% 45% at 50% -5%, rgba(50, 240, 140, 0.13) 0%, transparent 70%),
+    radial-gradient(ellipse 35% 30% at 15% 20%, rgba(96, 242, 189, 0.05) 0%, transparent 60%),
+    radial-gradient(ellipse 30% 25% at 85% 25%, rgba(50, 240, 140, 0.04) 0%, transparent 60%);
+  z-index: -1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trae-site::before {
+    display: none;
+  }
+
+  .trae-integrations-track {
+    animation: none !important;
+  }
+
+  .trae-footer-wordmark-char,
+  .trae-final-cta-accent.trae-gradient-text,
+  .trae-testimonials-accent.trae-gradient-text {
+    animation: none !important;
+  }
+
+  .trae-testimonials-track {
+    animation: none !important;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    max-width: var(--trae-max-width);
+    margin-inline: auto;
+    padding-inline: 16px;
+  }
+
+  .trae-testimonials-row {
+    mask-image: none;
+  }
+
+  .trae-testimonials-marquees {
+    gap: 16px;
+  }
+
+  .trae-card:hover {
+    transform: none;
+  }
+
+  .trae-announcement-pill {
+    animation: none;
+  }
+
+  .trae-shimmer-btn::after {
+    animation: none;
+  }
+
+  .trae-page-gradient {
+    display: none;
+  }
+}
+
+/* ── Performance layer ─────────────────────────────────────────────────────── */
+
+/*
+ * content-visibility: auto — the browser skips layout, paint, and compositing
+ * for sections that are off-screen. Paired with contain-intrinsic-size so the
+ * scrollbar height estimate stays accurate before the section is rendered.
+ * Applied only to below-fold sections (not the hero or marquee).
+ */
+.trae-site main > section:not(.trae-hero):not(.trae-integrations-marquee) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 480px;
+}
+
+/*
+ * Promote the marquee track to its own compositor layer.
+ * Prevents the continuous translate animation from triggering repaints.
+ */
+.trae-integrations-track {
+  will-change: transform;
+}
+
+/*
+ * Cards: isolate stacking context so the border-beam ::after pseudo-element
+ * and spotlight effects don't cause full-page repaints on hover.
+ */
+.trae-card {
+  contain: layout style;
+  isolation: isolate;
+}
+
+/*
+ * Spinning border in the demo section lives in its own layer so the
+ * continuous rotation doesn't drag the rest of the page with it.
+ */
+.trae-demo-spinner {
+  will-change: transform;
+}
+
+/* Reduce jank on the animated gradient text shine. */
+.trae-hero-accent {
+  will-change: background-position;
+}

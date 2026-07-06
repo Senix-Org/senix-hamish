@@ -1,5 +1,5 @@
 import { SiteNav } from '@features/shared/components/site-nav';
-import { SiteFooter } from '@features/shared/components/site-footer';
+import { TraeFooterSection } from '@features/marketing/components/trae/footer-section';
 
 /**
  * Minimal "coming soon" scaffold for public placeholder routes. Reuses the
@@ -22,7 +22,7 @@ export function ComingSoon({
         </h1>
         <p className="mt-4 max-w-md text-zinc-400 leading-relaxed">{subtitle}</p>
       </main>
-      <SiteFooter />
+      <TraeFooterSection />
     </>
   );
 }

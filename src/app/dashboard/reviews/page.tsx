@@ -4,6 +4,8 @@ import { createServerSupabaseClient } from '@features/shared/supabase-server';
 import { RecentAnalyses } from '@features/dashboard/components/recent-analyses';
 import { RealtimeReviews } from '@features/dashboard/components/realtime-reviews';
 import type { AnalysisCardData } from '@features/dashboard/components/analysis-card';
+import { DashboardSection } from '@features/dashboard/components/dashboard-ui';
+import { DashboardPageHeader } from '@features/dashboard/components/page-header';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -26,12 +28,6 @@ type AnalysisRow = {
   } | null;
 };
 
-/**
- * Reviews page. Lists every review Senix has posted for the signed-in
- * user, newest first, using the same card and filter UI as the overview.
- * RLS scopes the query to the user's own analyses. Realtime keeps the
- * list fresh as new reviews land.
- */
 export default async function ReviewsPage(): Promise<React.ReactElement> {
   const supabase = await createServerSupabaseClient();
 
@@ -45,8 +41,6 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
     .order('created_at', { ascending: false })
     .limit(200);
 
-  // Let failures bubble to the route's error.tsx boundary, which offers a
-  // retry that re-runs this query without a full-page reload.
   if (error) {
     throw new Error(error.message);
   }
@@ -66,17 +60,29 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
     repo_name: a.pull_requests?.repositories?.full_name ?? 'unknown',
   }));
 
+  const highCount = cards.filter((c) => c.risk_level === 'high').length;
+
   return (
     <div>
-      <header>
-        <h1 className="text-3xl font-semibold text-primary">Reviews</h1>
-        <p className="mt-2 text-sm text-secondary">
-          Every review Senix has posted, newest first.
-        </p>
-      </header>
-      <section className="mt-8">
+      <DashboardPageHeader
+        eyebrow="Reviews"
+        title="All reviews"
+        description={
+          <>
+            {cards.length} total · {highCount} high risk. Filter and sort below.
+          </>
+        }
+        action={
+          <Link href="/dashboard" className="btn-senix btn-senix-ghost text-sm">
+            Back to overview
+          </Link>
+        }
+      />
+
+      <DashboardSection className="mt-8" title="Review history" description="Newest first.">
         {cards.length === 0 ? <ReviewsEmptyState /> : <RecentAnalyses analyses={cards} />}
-      </section>
+      </DashboardSection>
+
       <RealtimeReviews />
     </div>
   );
@@ -84,11 +90,13 @@ export default async function ReviewsPage(): Promise<React.ReactElement> {
 
 function ReviewsEmptyState(): React.ReactElement {
   return (
-    <div className="flex flex-col items-center rounded-xl border border-surface-border bg-surface py-16 text-center">
-      <GitPullRequest size={32} strokeWidth={1.5} className="text-muted" />
+    <div className="flex flex-col items-center rounded-xl border border-dashed border-surface-border bg-surface/50 py-16 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-surface-border bg-surface-raised text-muted">
+        <GitPullRequest size={22} strokeWidth={1.5} />
+      </div>
       <p className="mt-4 text-sm font-medium text-primary">No reviews yet</p>
       <p className="mt-1 max-w-xs text-sm text-secondary">
-        Open a pull request on a connected repo and Senix will review it within 30 seconds.
+        Open a pull request on a connected repo. Senix usually reviews within 20–40 seconds.
       </p>
       <Link href="/dashboard" className="btn-senix btn-senix-secondary mt-5">
         View connected repos

@@ -2,10 +2,7 @@ import { SiteNav } from '@features/shared/components/site-nav';
 import { DocsSidebar } from '@features/shared/components/docs/docs-sidebar';
 
 /**
- * Docs shell. The viewport is split into a non-scrolling frame (SiteNav +
- * sidebar) and an independently scrollable content column on the right,
- * so the sidebar stays put while a page scrolls. Each route under /docs
- * renders its own page into `children`.
+ * Docs shell. Fixed nav + sidebar frame; content column scrolls independently.
  */
 export default function DocsLayout({
   children,
@@ -13,12 +10,16 @@ export default function DocsLayout({
   children: React.ReactNode;
 }): React.ReactElement {
   return (
-    <div className="h-screen flex flex-col bg-zinc-950 text-zinc-100">
+    <div className="flex h-screen flex-col bg-base text-primary">
       <SiteNav />
-      <div className="flex-1 min-h-0 flex">
+      <div className="relative flex min-h-0 flex-1">
+        <div
+          className="pointer-events-none absolute inset-0 bg-hero-dots opacity-40"
+          aria-hidden
+        />
         <DocsSidebar />
-        <main className="flex-1 min-w-0 overflow-y-auto">
-          <article className="mx-auto max-w-3xl px-6 sm:px-10 py-12 pb-24">
+        <main className="relative min-w-0 flex-1 overflow-y-auto">
+          <article className="mx-auto max-w-3xl px-6 py-10 pb-24 sm:px-10 sm:py-14">
             {children}
           </article>
         </main>

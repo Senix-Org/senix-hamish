@@ -14,16 +14,14 @@ type FaqProps = {
 };
 
 /**
- * Lightweight accessible accordion for the pricing FAQ. Only one panel
- * may be open at a time; opening another collapses the previous so the
- * page never grows unboundedly.
+ * Accessible accordion for the pricing FAQ. One panel open at a time.
  */
 export function Faq({ items }: FaqProps): React.ReactElement {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
   const prefersReducedMotion = useReducedMotion();
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 divide-y divide-zinc-800 overflow-hidden">
+    <div className="overflow-hidden rounded-xl border border-surface-border bg-surface divide-y divide-surface-border">
       {items.map((item, i) => {
         const isOpen = openIndex === i;
         return (
@@ -32,13 +30,13 @@ export function Faq({ items }: FaqProps): React.ReactElement {
               type="button"
               onClick={() => setOpenIndex(isOpen ? null : i)}
               aria-expanded={isOpen}
-              className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left text-zinc-100 hover:bg-zinc-900/50 transition-colors"
+              className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left text-primary transition-colors hover:bg-surface-raised"
             >
               <span className="font-medium">{item.q}</span>
               <ChevronDown
                 size={16}
-                className={`shrink-0 text-zinc-500 transition-transform ${
-                  isOpen ? 'rotate-180 text-zinc-300' : ''
+                className={`shrink-0 text-muted transition-transform ${
+                  isOpen ? 'rotate-180 text-secondary' : ''
                 }`}
               />
             </button>
@@ -51,7 +49,7 @@ export function Faq({ items }: FaqProps): React.ReactElement {
                   transition={{ duration: 0.22, ease: [0.21, 0.47, 0.32, 0.98] }}
                   className="overflow-hidden"
                 >
-                  <p className="px-5 pb-5 text-sm text-zinc-400 leading-relaxed">{item.a}</p>
+                  <p className="px-5 pb-5 text-sm leading-relaxed text-secondary">{item.a}</p>
                 </motion.div>
               )}
             </AnimatePresence>

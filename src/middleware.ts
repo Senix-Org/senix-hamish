@@ -38,12 +38,8 @@ export function enforceInternalBasicAuth(req: NextRequest): NextResponse {
     const [scheme, encoded] = auth.split(' ');
     if (scheme === 'Basic' && encoded) {
       const decoded = Buffer.from(encoded, 'base64').toString();
-      // Username-agnostic, matching verifyInternalAuth in
-      // src/lib/internal-auth.ts: only the password (everything after the
-      // first colon) is compared, in constant time.
-      const colon = decoded.indexOf(':');
-      const providedPassword = colon === -1 ? '' : decoded.slice(colon + 1);
-      if (timingSafeStringEqual(providedPassword, password)) {
+      const [, providedPassword] = decoded.split(':');
+      if (providedPassword === password) {
         return NextResponse.next();
       }
     }
@@ -53,38 +49,6 @@ export function enforceInternalBasicAuth(req: NextRequest): NextResponse {
     status: 401,
     headers: { 'WWW-Authenticate': 'Basic realm="Internal"' },
   });
-}
-
-/**
- * Constant-time string comparison, mirroring what src/lib/internal-auth.ts
- * does for the /api/internal/* routes with node:crypto's timingSafeEqual.
- *
- * node:crypto is NOT used here: middleware compiles against the Edge
- * Runtime and `next build` flags the import as unsupported (verified). On
- * Cloudflare Workers the WebCrypto extension crypto.subtle.timingSafeEqual
- * is available and used; in runtimes without it (next dev on Node, where
- * the extension does not exist) a constant-time XOR loop covers the same
- * property. A length mismatch returns early; the length of the secret is
- * not considered sensitive here.
- */
-function timingSafeStringEqual(a: string, b: string): boolean {
-  const enc = new TextEncoder();
-  const bufA = enc.encode(a);
-  const bufB = enc.encode(b);
-  if (bufA.length !== bufB.length) return false;
-
-  const subtle = crypto.subtle as SubtleCrypto & {
-    timingSafeEqual?: (a: ArrayBufferView, b: ArrayBufferView) => boolean;
-  };
-  if (typeof subtle.timingSafeEqual === 'function') {
-    return subtle.timingSafeEqual(bufA, bufB);
-  }
-
-  let diff = 0;
-  for (let i = 0; i < bufA.length; i += 1) {
-    diff |= bufA[i] ^ bufB[i];
-  }
-  return diff === 0;
 }
 
 /**
