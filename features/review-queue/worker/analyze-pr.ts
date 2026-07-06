@@ -7,7 +7,7 @@ import { isOverDailyCostCap } from '@features/ai-engine/cost-tracker';
 import { formatPRComment } from '@features/ai-engine/format-comment';
 import { upsertPRComment } from '@features/github-integration/github-comments';
 import type { JobPayloadMap } from '@features/review-queue/queue';
-import { claimAnalysis } from '@features/review-queue/queue';
+import { claimAnalysis, releaseAnalysisClaim } from '@features/review-queue/queue';
 import { getAppBaseUrl } from '@features/shared/mcp-config';
 import { isOverRepoLimit, recordTokenUsage } from '@features/billing/plan-limits';
 
@@ -199,6 +199,14 @@ export async function processAnalyzePr(
         error_message: err?.message ?? String(err),
       })
       .eq('id', analysisId);
+    // Release the Redis ownership claim immediately so a requeue can be
+    // picked up right away instead of waiting out the claim TTL (1 hour).
+    // Best-effort: a release failure must not mask the original error.
+    try {
+      await releaseAnalysisClaim(analysisId);
+    } catch (releaseErr) {
+      console.error(`[analyze-pr] ${analysisId}: failed to release claim`, releaseErr);
+    }
     throw err;
   } finally {
     // Safety net: if the row somehow slipped through still marked 'running'
@@ -221,6 +229,13 @@ export async function processAnalyzePr(
           error_message: 'Analysis did not complete',
         })
         .eq('id', analysisId);
+      // This is a failure path too: clear the claim so a requeue is not
+      // blocked until the TTL expires. Best-effort, same as the catch above.
+      try {
+        await releaseAnalysisClaim(analysisId);
+      } catch (releaseErr) {
+        console.error(`[analyze-pr] ${analysisId}: failed to release claim`, releaseErr);
+      }
     }
   }
 }

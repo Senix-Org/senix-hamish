@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { whopsdk } from '@/lib/whop-sdk';
+import { verifyInternalAuth, internalUnauthorized } from '@/lib/internal-auth';
 import { supabaseAdmin } from '@features/shared/supabase';
 import { planForWhopPlanId } from '@features/billing/whop';
 import type { PlanName, PlanStatus } from '@features/billing/plan-limits';
@@ -20,37 +21,6 @@ type ReconcileResult = {
   downgraded: number;
   unmatched: number;
 };
-
-/**
- * Authorize the caller. Two accepted forms:
- * - The scheduled GitHub Actions workflow (.github/workflows/cron-reconcile.yml)
- *   sends `Authorization: Bearer <CRON_SECRET>` when CRON_SECRET is set.
- *   This is the production trigger.
- * - Basic auth against INTERNAL_PASSWORD, matching the other /api/internal/*
- *   routes, for manual runs.
- * When neither secret is configured we allow the request (local/dev).
- */
-function isAuthorized(req: NextRequest): boolean {
-  const cronSecret = process.env.CRON_SECRET;
-  const password = process.env.INTERNAL_PASSWORD;
-  if (!cronSecret && !password) return true;
-
-  const auth = req.headers.get('authorization') ?? '';
-
-  if (cronSecret && auth === `Bearer ${cronSecret}`) return true;
-
-  if (password && auth.startsWith('Basic ')) {
-    try {
-      const decoded = Buffer.from(auth.slice('Basic '.length), 'base64').toString('utf8');
-      const [, candidate] = decoded.split(':');
-      if (candidate === password) return true;
-    } catch {
-      // fall through to unauthorized
-    }
-  }
-
-  return false;
-}
 
 /**
  * Periodic reconciliation between Whop and Supabase. Catches silently dropped
@@ -177,8 +147,8 @@ async function findUser(column: 'id' | 'whop_membership_id', value: string): Pro
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  if (!isAuthorized(req)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!verifyInternalAuth(req)) {
+    return internalUnauthorized();
   }
   try {
     const result = await reconcile();

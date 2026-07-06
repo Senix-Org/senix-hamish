@@ -50,7 +50,7 @@ vi.mock('@features/github-integration/github-diff', () => ({ fetchPRFiles, fetch
 vi.mock('@features/ai-engine/llm', () => ({ analyzePR }));
 vi.mock('@features/ai-engine/cost-tracker', () => ({ isOverDailyCostCap }));
 vi.mock('@features/github-integration/github-comments', () => ({ upsertPRComment }));
-vi.mock('@features/review-queue/queue', () => ({ claimAnalysis }));
+vi.mock('@features/review-queue/queue', () => ({ claimAnalysis, releaseAnalysisClaim: vi.fn() }));
 vi.mock('@features/billing/plan-limits', () => ({
   isOverRepoLimit: vi.fn().mockResolvedValue(false),
   recordTokenUsage: vi.fn().mockResolvedValue(0),

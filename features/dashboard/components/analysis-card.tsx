@@ -19,10 +19,11 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
 
 const FAILED_BADGE = { label: 'Review Failed', className: 'text-risk-high bg-risk-high/10' };
 
-// A review still marked `running` with no completion this long after it was
-// created is treated as failed. This catches rows that died before the
-// timeout fix could record a status (the analyze-pr function used to be
-// killed at 60s, leaving the row spinning forever).
+// A review still marked `running` or `queued` with no completion this long
+// after it was created is treated as failed. This catches rows that died
+// before a status could be recorded (the analyze-pr function used to be
+// killed at 60s) and rows stuck at `queued` behind a stale ownership claim,
+// so neither leaves a permanent spinner.
 const STALE_AFTER_MS = 10 * 60 * 1000;
 
 export type AnalysisCardData = {
@@ -58,7 +59,7 @@ export function AnalysisCard({ analysis }: { analysis: AnalysisCardData }): Reac
   // server/client boundary crossing.
   const now = Date.now(); // eslint-disable-line react-hooks/purity
   const stale =
-    analysis.status === 'running' &&
+    (analysis.status === 'running' || analysis.status === 'queued') &&
     !analysis.completed_at &&
     now - created.getTime() > STALE_AFTER_MS;
   const failed = analysis.status === 'failed' || stale;
