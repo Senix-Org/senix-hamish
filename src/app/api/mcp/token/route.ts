@@ -17,10 +17,32 @@ export const dynamic = 'force-dynamic';
 
 const MAX_NAME_LEN = 60;
 
+// Cap on live tokens per user. Revoking a token hard-deletes its row
+// (src/app/dashboard/mcp-token-actions.ts), so revoking frees a slot.
+const MAX_TOKENS_PER_USER = 10;
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const userId = await currentAppUserId();
   if (!userId) {
     return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
+  }
+
+  const { count, error: countError } = await supabaseAdmin
+    .from('mcp_tokens')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId);
+
+  if (countError) {
+    return NextResponse.json({ error: countError.message }, { status: 500 });
+  }
+
+  if (count !== null && count >= MAX_TOKENS_PER_USER) {
+    return NextResponse.json(
+      {
+        error: `Maximum of ${MAX_TOKENS_PER_USER} tokens per user allowed. Please revoke an existing token first.`,
+      },
+      { status: 429 }
+    );
   }
 
   let body: unknown;
