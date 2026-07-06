@@ -30,7 +30,23 @@ function loadPrivateKey(): string {
   }
 }
 
+/**
+ * Module-scope Octokit cache, one instance per installation id.
+ *
+ * Every new Octokit with createAppAuth signs a fresh app JWT and exchanges
+ * it for an installation token on first use. @octokit/auth-app caches that
+ * installation token INSIDE the instance (with expiry handling and renewal),
+ * so reusing the instance across all fetches in an analysis run removes the
+ * per-call JWT signing and token exchange. On Cloudflare Workers the cache
+ * is per-isolate, which is fine: the credentials are app-level, not
+ * user-specific, and isolates are reused across requests.
+ */
+const octokitCache = new Map<number, Octokit>();
+
 export function getInstallationOctokit(installationId: number): Octokit {
+  const cached = octokitCache.get(installationId);
+  if (cached) return cached;
+
   const appId = process.env.GITHUB_APP_ID!;
   const privateKey = loadPrivateKey();
 
@@ -38,7 +54,7 @@ export function getInstallationOctokit(installationId: number): Octokit {
     throw new Error('GITHUB_APP_ID must be set');
   }
 
-  return new Octokit({
+  const octokit = new Octokit({
     authStrategy: createAppAuth,
     auth: {
       appId,
@@ -46,6 +62,8 @@ export function getInstallationOctokit(installationId: number): Octokit {
       installationId,
     },
   });
+  octokitCache.set(installationId, octokit);
+  return octokit;
 }
 
 export function getAppOctokit(): Octokit {

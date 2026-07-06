@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '@features/shared/supabase';
-import { checkRepoLimit, syncReposConnected } from '@features/billing/plan-limits';
+import { getUserPlan, syncReposConnected } from '@features/billing/plan-limits';
 
 type GitHubRepoPayload = {
   id: number;
@@ -172,8 +172,14 @@ type InstallationPayload = {
        )
      );
 
-     let connectedCount = await syncReposConnected(userId);
+     // One plan read and one connected-count recount BEFORE the loop; the
+     // loop itself only does in-memory bookkeeping against a projected count.
+     const connectedCount = await syncReposConnected(userId);
+     const userPlan = await getUserPlan(userId);
+     const repoLimit = userPlan.effectiveLimit.repos;
+
      const allowedRows: RepoInsertRow[] = [];
+     let projectedCount = connectedCount;
 
      for (const repoRow of repoRows) {
        if (existingRepoIds.has(repoRow.github_repo_id)) {
@@ -181,23 +187,27 @@ type InstallationPayload = {
          continue;
        }
 
-       await supabaseAdmin
-         .from('users')
-         .update({ repos_connected: connectedCount })
-         .eq('id', userId);
-
-       const limit = await checkRepoLimit(userId);
-       if (!limit.allowed) {
+       if (repoLimit !== -1 && projectedCount >= repoLimit) {
          console.warn('[installation] repo limit reached', {
            userId,
            repo: repoRow.full_name,
-           reason: limit.reason,
+           reason: `Repo limit reached for the ${userPlan.effectiveLimit.label} plan.`,
          });
          continue;
        }
 
        allowedRows.push(repoRow);
-       connectedCount += 1;
+       projectedCount += 1;
+     }
+
+     // One write AFTER the loop instead of one per admitted repo. The caller
+     // runs syncReposConnected again once the rows are actually upserted, so
+     // this is the provisional count that keeps the limit honest meanwhile.
+     if (projectedCount !== connectedCount) {
+       await supabaseAdmin
+         .from('users')
+         .update({ repos_connected: projectedCount })
+         .eq('id', userId);
      }
 
      return allowedRows;

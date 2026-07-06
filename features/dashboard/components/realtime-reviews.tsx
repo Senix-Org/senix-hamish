@@ -23,9 +23,24 @@ export function RealtimeReviews(): React.ReactElement | null {
   const router = useRouter();
   const [toast, setToast] = useState(false);
   const toastTimer = useRef<number | null>(null);
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const supabase = createBrowserSupabaseClient();
+
+    // Debounce server re-renders: a burst of Realtime events (e.g. several
+    // analyses completing at once) collapses into a single router.refresh()
+    // two seconds after the last event, instead of one full re-render per
+    // event. The toast still fires immediately on its event.
+    function debouncedRefresh(): void {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
+      refreshTimeoutRef.current = setTimeout(() => {
+        router.refresh();
+        refreshTimeoutRef.current = null;
+      }, 2000);
+    }
 
     const channel = supabase
       .channel('dashboard-analyses')
@@ -33,7 +48,7 @@ export function RealtimeReviews(): React.ReactElement | null {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'analyses' },
         () => {
-          router.refresh();
+          debouncedRefresh();
         }
       )
       .on(
@@ -42,7 +57,7 @@ export function RealtimeReviews(): React.ReactElement | null {
         (payload) => {
           const next = payload.new as { status?: string } | null;
           const prev = payload.old as { status?: string } | null;
-          router.refresh();
+          debouncedRefresh();
           if (next?.status === 'completed' && prev?.status !== 'completed') {
             showToast();
           }
@@ -57,6 +72,9 @@ export function RealtimeReviews(): React.ReactElement | null {
     }
 
     return () => {
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+      }
       if (toastTimer.current) window.clearTimeout(toastTimer.current);
       supabase.removeChannel(channel);
     };

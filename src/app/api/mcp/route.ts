@@ -14,6 +14,11 @@ import { postMcpReviewToGithub } from '@features/github-integration/post-mcp-rev
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Cap on the serialized `changes` payload, matching the playground's 50KB
+// diff cap, so an IDE cannot drive an arbitrarily expensive LLM call within
+// one rate window.
+const MAX_MCP_PAYLOAD_BYTES = 50 * 1024;
+
 /**
  * MCP server for Senix.
  *
@@ -333,12 +338,29 @@ async function handleRpc(rpc: JsonRpcRequest, token: McpTokenRow): Promise<RpcOu
         // before the monthly cap catches up.
         const rateLimit = await checkMcpRateLimit(token.user_id);
         if (!rateLimit.allowed) {
-          const retryAfter = Math.ceil(rateLimit.resetsAt - Date.now() / 1000);
           return rpcError(
             id,
             RATE_LIMIT_REACHED,
-            `Rate limit: too many requests. Try again in ${Math.max(1, retryAfter)} seconds.`
+            `Rate limit exceeded. Try again in ${Math.max(1, rateLimit.retryAfterSeconds)} seconds.`
           );
+        }
+
+        // Size cap BEFORE the budget gate on purpose: checkTokenLimit now
+        // atomically reserves the token estimate, so rejecting an oversized
+        // payload after it would leak the reservation from the user's budget.
+        const payloadSize = Buffer.byteLength(JSON.stringify(args.changes ?? ''), 'utf8');
+        if (payloadSize > MAX_MCP_PAYLOAD_BYTES) {
+          return rpcResult(id, {
+            isError: true,
+            content: [
+              {
+                type: 'text',
+                text:
+                  `Changes payload exceeds the 50KB limit (${Math.round(payloadSize / 1024)}KB). ` +
+                  `Please review a smaller diff or split the changes into multiple reviews.`,
+              },
+            ],
+          });
         }
 
         const limit = await checkTokenLimit(token.user_id, ESTIMATED_TOKENS_PER_REVIEW, 'mcp');

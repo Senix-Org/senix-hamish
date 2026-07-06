@@ -141,7 +141,10 @@ ${truncate(change.after.bodyText)}`;
   return `[${change.change}] ${change.id}`;
 }
 
-function truncate(text: string): string {
+// bodyText is optional on SymbolChange (omitted for unchanged symbols, which
+// are filtered out above); guard anyway so the type stays honest.
+function truncate(text: string | undefined): string {
+  if (!text) return '';
   if (text.length <= MAX_BODY_CHARS) return text;
   return `${text.slice(0, MAX_BODY_CHARS)}\n...[truncated]`;
 }

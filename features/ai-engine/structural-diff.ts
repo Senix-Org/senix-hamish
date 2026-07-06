@@ -8,8 +8,14 @@ import { detectLanguage, parseFile, SupportedLanguage } from './parser';
      name: string;
      kind: Symbol['kind'];
      change: ChangeKind;
-     before: { startLine: number; endLine: number; bodyText: string } | null;
-     after: { startLine: number; endLine: number; bodyText: string } | null;
+     /**
+      * bodyText is present only for added/removed/modified symbols. Unchanged
+      * symbols keep their location metadata but omit the body: it adds no
+      * analysis signal and dominated the size of the structural diff stored
+      * in analyses.risk_flags on large PRs.
+      */
+     before: { startLine: number; endLine: number; bodyText?: string } | null;
+     after: { startLine: number; endLine: number; bodyText?: string } | null;
    }
    
    export interface FileStructuralDiff {
@@ -74,10 +80,12 @@ import { detectLanguage, parseFile, SupportedLanguage } from './parser';
            after: { startLine: after.startLine, endLine: after.endLine, bodyText: after.bodyText },
          });
        } else {
+         // Unchanged: keep structural metadata, drop the body text (see the
+         // SymbolChange doc comment).
          changes.push({
            id, name: after.name, kind: after.kind, change: 'unchanged',
-           before: { startLine: before.startLine, endLine: before.endLine, bodyText: before.bodyText },
-           after: { startLine: after.startLine, endLine: after.endLine, bodyText: after.bodyText },
+           before: { startLine: before.startLine, endLine: before.endLine },
+           after: { startLine: after.startLine, endLine: after.endLine },
          });
        }
      }
