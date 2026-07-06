@@ -8,9 +8,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * uninstalls would not stop access.
  */
 
-const { syncReposConnected, checkRepoLimit } = vi.hoisted(() => ({
+const { syncReposConnected, getUserPlan } = vi.hoisted(() => ({
   syncReposConnected: vi.fn(async () => 0),
-  checkRepoLimit: vi.fn(async () => ({ allowed: true })),
+  getUserPlan: vi.fn(async () => ({
+    effectiveLimit: { repos: -1, tokens: 0, label: 'Pro' },
+  })),
 }));
 
 const calls = { reposUpsert: 0, instUpsert: 0, instUpdate: 0, reposDelete: 0 };
@@ -43,7 +45,7 @@ function makeQuery(table: string) {
 }
 
 vi.mock('@features/shared/supabase', () => ({ supabaseAdmin: { from: (t: string) => makeQuery(t) } }));
-vi.mock('@features/billing/plan-limits', () => ({ syncReposConnected, checkRepoLimit }));
+vi.mock('@features/billing/plan-limits', () => ({ syncReposConnected, getUserPlan }));
 
 import { handleInstallation } from '@features/webhook/handlers/installation';
 

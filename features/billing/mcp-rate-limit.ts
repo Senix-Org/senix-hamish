@@ -49,8 +49,10 @@ export type McpRateLimitResult = {
   allowed: boolean;
   /** Approximate remaining calls in the current window. */
   remaining: number;
-  /** Epoch seconds until the current window resets. */
+  /** Absolute epoch SECONDS at which the current window resets. */
   resetsAt: number;
+  /** Whole seconds until the window resets; safe for user-facing messages. */
+  retryAfterSeconds: number;
 };
 
 /**
@@ -62,11 +64,18 @@ export type McpRateLimitResult = {
 export async function checkMcpRateLimit(userId: string): Promise<McpRateLimitResult> {
   try {
     const result = await ratelimit().limit(userId);
-    const resetsAt = Math.floor(Date.now() / 1000) + (result.reset ?? WINDOW_SECONDS);
+    // result.reset is an ABSOLUTE Unix timestamp in milliseconds (per the
+    // @upstash/ratelimit RatelimitResponse type: "Unix timestamp in
+    // milliseconds when the limits are reset"), not a relative offset. The
+    // old code added it to Date.now()/1000, producing a nonsense far-future
+    // "try again in N seconds" value.
+    const resetsAt = Math.ceil(result.reset / 1000);
+    const retryAfterSeconds = Math.max(0, resetsAt - Math.floor(Date.now() / 1000));
     return {
       allowed: result.success,
       remaining: Math.max(0, result.remaining),
       resetsAt,
+      retryAfterSeconds,
     };
   } catch {
     // Fail open: Redis down should not block legitimate users.
@@ -74,6 +83,7 @@ export async function checkMcpRateLimit(userId: string): Promise<McpRateLimitRes
       allowed: true,
       remaining: MCP_RATE_LIMIT,
       resetsAt: Math.floor(Date.now() / 1000) + WINDOW_SECONDS,
+      retryAfterSeconds: WINDOW_SECONDS,
     };
   }
 }

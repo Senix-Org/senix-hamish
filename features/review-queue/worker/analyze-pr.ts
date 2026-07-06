@@ -16,6 +16,10 @@ import {
 } from '@features/billing/plan-limits';
 
 const MAX_FILES_FOR_STRUCTURAL_DIFF = 50;
+// How many files to fetch from GitHub at a time. Full parallelism would let
+// a 50-file PR burst-fire the GitHub API and trip abuse limits; batches of
+// 10 are a safe starting point.
+const FILE_FETCH_CONCURRENCY = 10;
 const REPO_LIMIT_COMMENT = `This repository is over your Senix plan's repo limit, so Senix skipped this review. Upgrade or disconnect repos at ${getAppBaseUrl()}/dashboard/billing`;
 
 type PrRow = { title: string | null; author_login: string | null };
@@ -99,22 +103,32 @@ export async function processAnalyzePr(
 
     const structural: FileStructuralDiff[] = [];
     if (supportedFiles.length <= MAX_FILES_FOR_STRUCTURAL_DIFF) {
-      for (const file of supportedFiles) {
-        const beforeContent =
-          file.status === 'added'
-            ? null
-            : await fetchFileContent(
-                installationId,
-                owner,
-                repo,
-                file.previous_filename ?? file.filename,
-                baseSha
-              );
-        const afterContent =
-          file.status === 'removed'
-            ? null
-            : await fetchFileContent(installationId, owner, repo, file.filename, headSha);
-        structural.push(diffFile(file.filename, beforeContent, afterContent));
+      // Fetch file contents in parallel batches instead of one file at a
+      // time. The Octokit instance (and its cached installation token) is
+      // shared across all of these calls via getInstallationOctokit's
+      // module-scope cache, so no per-call JWT signing happens either.
+      for (let i = 0; i < supportedFiles.length; i += FILE_FETCH_CONCURRENCY) {
+        const batch = supportedFiles.slice(i, i + FILE_FETCH_CONCURRENCY);
+        const batchResults = await Promise.all(
+          batch.map(async (file) => {
+            const beforeContent =
+              file.status === 'added'
+                ? null
+                : await fetchFileContent(
+                    installationId,
+                    owner,
+                    repo,
+                    file.previous_filename ?? file.filename,
+                    baseSha
+                  );
+            const afterContent =
+              file.status === 'removed'
+                ? null
+                : await fetchFileContent(installationId, owner, repo, file.filename, headSha);
+            return diffFile(file.filename, beforeContent, afterContent);
+          })
+        );
+        structural.push(...batchResults);
       }
     }
 
