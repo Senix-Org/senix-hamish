@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@features/shared/supabase';
 import { currentAppUserId, formatTokenDate, mintMcpToken } from '@features/auth/mcp-tokens';
+import { MAX_TOKENS_PER_USER } from '@/lib/constants';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,20 +18,19 @@ export const dynamic = 'force-dynamic';
 
 const MAX_NAME_LEN = 60;
 
-// Cap on live tokens per user. Revoking a token hard-deletes its row
-// (src/app/dashboard/mcp-token-actions.ts), so revoking frees a slot.
-const MAX_TOKENS_PER_USER = 10;
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const userId = await currentAppUserId();
   if (!userId) {
     return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
   }
 
+  // Count only live tokens: the tokens page soft-revokes (sets revoked_at)
+  // rather than deleting, and revoked tokens must free their slot.
   const { count, error: countError } = await supabaseAdmin
     .from('mcp_tokens')
     .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .is('revoked_at', null);
 
   if (countError) {
     return NextResponse.json({ error: countError.message }, { status: 500 });
