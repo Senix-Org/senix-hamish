@@ -2,14 +2,14 @@ import { createHash } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@features/shared/supabase';
 import { formatShippingBrief, runAnalysis } from '@features/ai-engine/analyze-changes';
-import { checkTokenLimit, recordTokenUsage } from '@features/billing/plan-limits';
+import {
+  checkTokenLimit,
+  recordTokenUsage,
+  ESTIMATED_TOKENS_PER_REVIEW,
+} from '@features/billing/plan-limits';
 import { checkMcpRateLimit } from '@features/billing/mcp-rate-limit';
 import { getAppBaseUrl } from '@features/shared/mcp-config';
 import { postMcpReviewToGithub } from '@features/github-integration/post-mcp-review';
-
-// Conservative up-front estimate; the real token count is recorded after the
-// LLM responds so usage reflects actual tokens, not the estimate.
-const ESTIMATED_TOKENS_PER_REVIEW = 2000;
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -352,10 +352,10 @@ async function handleRpc(rpc: JsonRpcRequest, token: McpTokenRow): Promise<RpcOu
 
         const { result, filesReviewed } = await runAnalysis(args);
 
-        // Record actual token usage (source of truth). Never let a usage
-        // bookkeeping failure break the review the user already received.
+        // True usage up from the reserved estimate to the actual count. Never
+        // let a usage bookkeeping failure break the review the user received.
         try {
-          await recordTokenUsage(token.user_id, result.tokensUsed, 'mcp');
+          await recordTokenUsage(token.user_id, result.tokensUsed, 'mcp', ESTIMATED_TOKENS_PER_REVIEW);
         } catch (usageErr) {
           console.error('[mcp] failed to record token usage', usageErr);
         }

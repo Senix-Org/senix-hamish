@@ -1,42 +1,71 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
- * Proves: the daily cost cap correctly sums today's spend and reports when
- * the cap is exceeded, so the worker can skip LLM calls and stop runaway
- * spend.
- * Failure means: a loop or abuse could drain the LLM budget unbounded.
+ * Proves: the daily cost cap gate goes through the atomic
+ * check_and_reserve_daily_cost RPC (sum + compare in one transaction) and
+ * the dashboard total uses a SQL aggregate instead of pulling every row.
+ * Failure means: a loop or abuse could drain the LLM budget unbounded, or
+ * the gate would regress to the racy full-table scan.
  */
 
-const gte = vi.fn();
+const { single, rpc } = vi.hoisted(() => ({ single: vi.fn(), rpc: vi.fn() }));
 
 vi.mock('@features/shared/supabase', () => ({
   supabaseAdmin: {
-    from: () => ({ select: () => ({ gte }) }),
+    from: () => ({ select: () => ({ gte: () => ({ single }) }) }),
+    rpc,
   },
 }));
 
-import { isOverDailyCostCap, getTodayCostCents, DAILY_COST_CAP_CENTS } from '@features/ai-engine/cost-tracker';
+import {
+  isOverDailyCostCap,
+  getTodayCostCents,
+  DAILY_COST_CAP_CENTS,
+  ESTIMATED_ANALYSIS_COST_CENTS,
+} from '@features/ai-engine/cost-tracker';
 
-beforeEach(() => gte.mockReset());
+beforeEach(() => {
+  single.mockReset();
+  rpc.mockReset();
+});
 
-describe('cost cap enforcement', () => {
-  it('sums cost across analyses, treating null cost as 0', async () => {
-    gte.mockResolvedValue({ data: [{ cost_usd_cents: 100 }, { cost_usd_cents: null }, { cost_usd_cents: 50 }], error: null });
+describe('getTodayCostCents (SQL aggregate)', () => {
+  it('returns the database-side SUM, one number instead of all rows', async () => {
+    single.mockResolvedValue({ data: { sum: 150 }, error: null });
     expect(await getTodayCostCents()).toBe(150);
   });
 
-  it('reports under cap when spend is below the limit', async () => {
-    gte.mockResolvedValue({ data: [{ cost_usd_cents: DAILY_COST_CAP_CENTS - 1 }], error: null });
-    expect(await isOverDailyCostCap()).toBe(false);
-  });
-
-  it('reports over cap when spend exceeds the limit (review must be rejected)', async () => {
-    gte.mockResolvedValue({ data: [{ cost_usd_cents: DAILY_COST_CAP_CENTS + 1 }], error: null });
-    expect(await isOverDailyCostCap()).toBe(true);
+  it('treats a NULL sum (no analyses today) as 0', async () => {
+    single.mockResolvedValue({ data: { sum: null }, error: null });
+    expect(await getTodayCostCents()).toBe(0);
   });
 
   it('throws on a DB error so the caller does not silently keep spending blind', async () => {
-    gte.mockResolvedValue({ data: null, error: { message: 'db down' } });
+    single.mockResolvedValue({ data: null, error: { message: 'db down' } });
     await expect(getTodayCostCents()).rejects.toThrow(/Failed to load/);
+  });
+});
+
+describe('isOverDailyCostCap (atomic RPC gate)', () => {
+  it('is under cap when the RPC allows the estimate', async () => {
+    rpc.mockResolvedValue({ data: true, error: null });
+    expect(await isOverDailyCostCap()).toBe(false);
+    expect(rpc).toHaveBeenCalledWith(
+      'check_and_reserve_daily_cost',
+      expect.objectContaining({
+        estimate_cents: ESTIMATED_ANALYSIS_COST_CENTS,
+        cap_cents: DAILY_COST_CAP_CENTS,
+      })
+    );
+  });
+
+  it('is over cap when the RPC rejects the estimate (review must be skipped)', async () => {
+    rpc.mockResolvedValue({ data: false, error: null });
+    expect(await isOverDailyCostCap()).toBe(true);
+  });
+
+  it('throws on an RPC error so the caller does not silently keep spending', async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: 'db down' } });
+    await expect(isOverDailyCostCap()).rejects.toThrow(/Failed to check/);
   });
 });

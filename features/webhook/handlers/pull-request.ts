@@ -2,14 +2,10 @@ import { after } from 'next/server';
 import { supabaseAdmin } from '@features/shared/supabase';
 import { enqueue, type JobPayloadMap } from '@features/review-queue/queue';
 import { processAnalyzePr } from '@features/review-queue/worker/analyze-pr';
-import { checkTokenLimit } from '@features/billing/plan-limits';
+import { checkTokenLimit, ESTIMATED_TOKENS_PER_REVIEW } from '@features/billing/plan-limits';
 import { upsertPRComment } from '@features/github-integration/github-comments';
 import { getAppBaseUrl } from '@features/shared/mcp-config';
 import { findRepository } from './lookup';
-
-// Conservative up-front estimate for one PR review. The worker records the
-// real token count from the LLM response after the analysis completes.
-const ESTIMATED_TOKENS_PER_REVIEW = 2000;
 
 /**
  * Handles pull_request events. Action set is intentionally narrow.

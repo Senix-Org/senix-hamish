@@ -33,7 +33,7 @@ function makeQuery() {
   return obj;
 }
 
-vi.mock('@features/billing/plan-limits', () => ({ checkTokenLimit }));
+vi.mock('@features/billing/plan-limits', () => ({ checkTokenLimit, ESTIMATED_TOKENS_PER_REVIEW: 2000 }));
 vi.mock('@features/github-integration/github-comments', () => ({ upsertPRComment }));
 vi.mock('@features/review-queue/queue', () => ({ enqueue }));
 vi.mock('@features/webhook/handlers/lookup', () => ({ findRepository }));

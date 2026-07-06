@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
  * INTEGRATION (idempotency): the GitHub webhook route is hit twice with the
- * SAME x-github-delivery id. The first is routed and processed; the second
- * is recognized as a duplicate and skipped, so no second analysis (and thus
- * no double comment) is produced.
- * Proves the audit gap fix end to end at the route boundary.
+ * SAME x-github-delivery id. The first claims the delivery (its insert
+ * lands) and is routed; the second hits the unique violation on the claim
+ * insert and is skipped, so no second analysis (and thus no double comment)
+ * is produced. Unlike the old processed-flag check, this holds even when the
+ * two deliveries arrive concurrently, because the claim is the INSERT.
  * Failure means: GitHub retries would double-review PRs and spam comments.
  */
 
@@ -14,16 +15,22 @@ const { verifyGithubSignature, routeEvent } = vi.hoisted(() => ({
   routeEvent: vi.fn(async () => 'pull_request:opened'),
 }));
 
-// webhook_events: first lookup finds nothing (not processed), second finds a
-// processed row for the same delivery id.
-let processedRowExists = false;
+// webhook_events claim: the first insert of a delivery id lands; once
+// claimExists is set, further inserts fail with the 23505 unique violation.
+let claimExists = false;
 
 function makeQuery() {
   const obj: Record<string, unknown> = {};
-  for (const m of ['select', 'eq', 'insert']) obj[m] = () => obj;
+  obj.insert = () => obj;
+  obj.select = () => obj;
+  obj.eq = () => obj;
   obj.update = () => obj;
-  obj.maybeSingle = () =>
-    Promise.resolve({ data: processedRowExists ? { github_delivery_id: 'D1', processed: true } : null, error: null });
+  obj.single = () =>
+    Promise.resolve(
+      claimExists
+        ? { data: null, error: { code: '23505', message: 'duplicate key value' } }
+        : { data: { id: 'evt-row-1' }, error: null }
+    );
   obj.then = (resolve: (v: { data: null; error: null }) => unknown) => resolve({ data: null, error: null });
   return obj;
 }
@@ -47,7 +54,7 @@ function delivery(id: string) {
 
 beforeEach(() => {
   process.env.GITHUB_WEBHOOK_SECRET = 'secret';
-  processedRowExists = false;
+  claimExists = false;
   routeEvent.mockClear();
 });
 
@@ -57,8 +64,8 @@ describe('webhook duplicate delivery', () => {
     expect(routeEvent).toHaveBeenCalledOnce();
     expect((await first.json()).ok).toBe(true);
 
-    // Simulate the first delivery having been recorded as processed.
-    processedRowExists = true;
+    // Simulate the first delivery's claim row now existing.
+    claimExists = true;
 
     const second = await POST(delivery('D1'));
     const body = await second.json();
@@ -67,7 +74,7 @@ describe('webhook duplicate delivery', () => {
     expect(routeEvent).toHaveBeenCalledOnce();
   });
 
-  it('still rejects an invalid signature before any dedup/routing', async () => {
+  it('still rejects an invalid signature before any claim/routing', async () => {
     verifyGithubSignature.mockReturnValueOnce(false);
     const res = await POST(delivery('D2'));
     expect(res.status).toBe(401);
