@@ -36,14 +36,12 @@ import { detectLanguage, parseFile, SupportedLanguage } from './parser';
    /**
     * Diff one file's before & after content into a list of symbol-level changes.
     * If beforeContent is null, the file is newly added. If afterContent is null, removed.
-    * Async because parsing goes through web-tree-sitter, whose runtime and
-    * grammars load lazily.
     */
-   export async function diffFile(
+   export function diffFile(
      filename: string,
      beforeContent: string | null,
      afterContent: string | null
-   ): Promise<FileStructuralDiff> {
+   ): FileStructuralDiff {
      const language = detectLanguage(filename);
    
      // Unsupported file types: still report a diff, just with no symbol detail
@@ -57,8 +55,8 @@ import { detectLanguage, parseFile, SupportedLanguage } from './parser';
        };
      }
    
-     const beforeSymbols = beforeContent ? await parseAndExtract(beforeContent, language) : [];
-     const afterSymbols = afterContent ? await parseAndExtract(afterContent, language) : [];
+     const beforeSymbols = beforeContent ? parseAndExtract(beforeContent, language) : [];
+     const afterSymbols = afterContent ? parseAndExtract(afterContent, language) : [];
    
      const beforeById = new Map(beforeSymbols.map((s) => [s.id, s]));
      const afterById = new Map(afterSymbols.map((s) => [s.id, s]));
@@ -111,8 +109,8 @@ import { detectLanguage, parseFile, SupportedLanguage } from './parser';
      return { filename, language, supported: true, changes, summary };
    }
    
-   async function parseAndExtract(content: string, language: SupportedLanguage): Promise<Symbol[]> {
-     const tree = await parseFile(content, language);
+   function parseAndExtract(content: string, language: SupportedLanguage): Symbol[] {
+     const tree = parseFile(content, language);
      if (!tree) return [];
      return extractSymbols(tree, language);
    }

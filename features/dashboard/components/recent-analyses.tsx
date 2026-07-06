@@ -4,6 +4,35 @@ import { useMemo, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { AnalysisCard, type AnalysisCardData } from './analysis-card';
 
+function RiskPill({
+  value,
+  active,
+  onClick,
+}: {
+  value: RiskFilter;
+  active: boolean;
+  onClick: () => void;
+}): React.ReactElement {
+  const activeClass = {
+    all: 'bg-surface text-primary shadow-sm',
+    high: 'bg-surface text-risk-high shadow-sm',
+    medium: 'bg-surface text-risk-medium shadow-sm',
+    low: 'bg-surface text-risk-low shadow-sm',
+  }[value];
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-colors duration-150 ${
+        active ? activeClass : 'text-secondary hover:text-primary'
+      }`}
+    >
+      {value === 'all' ? 'All' : value}
+    </button>
+  );
+}
+
 const RISK_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
 type RiskFilter = 'all' | 'high' | 'medium' | 'low';
@@ -43,18 +72,13 @@ export function RecentAnalyses({
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <FilterSelect
-          label="Risk"
-          value={risk}
-          onChange={(v) => setRisk(v as RiskFilter)}
-          options={[
-            { value: 'all', label: 'All' },
-            { value: 'high', label: 'High' },
-            { value: 'medium', label: 'Medium' },
-            { value: 'low', label: 'Low' },
-          ]}
-        />
+      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-surface-border bg-surface p-3">
+        <div className="inline-flex items-center gap-1 rounded-lg border border-surface-border bg-surface-raised p-1">
+          {(['all', 'high', 'medium', 'low'] as RiskFilter[]).map((r) => (
+            <RiskPill key={r} value={r} active={risk === r} onClick={() => setRisk(r)} />
+          ))}
+        </div>
+
         <FilterSelect
           label="Sort"
           value={sort}
@@ -62,10 +86,11 @@ export function RecentAnalyses({
           options={[
             { value: 'newest', label: 'Newest first' },
             { value: 'oldest', label: 'Oldest first' },
-            { value: 'risk', label: 'Highest risk first' },
+            { value: 'risk', label: 'Highest risk' },
           ]}
         />
-        <span className="ml-auto text-xs tabular-nums text-muted">
+
+        <span className="ml-auto rounded-md bg-surface-raised px-2 py-1 text-xs tabular-nums text-muted">
           {visible.length} of {analyses.length}
         </span>
       </div>

@@ -4,29 +4,29 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { WhopCheckoutDialog } from '@/components/whop-checkout-dialog';
+import type { PlanName } from '@features/billing/plan-limits';
 
-type PlanName = 'free' | 'starter' | 'team' | 'pro';
+type BillingPeriod = 'monthly' | 'yearly';
 type PaidPlan = Exclude<PlanName, 'free'>;
 
 type Props = {
   plan: PlanName;
   label: string;
   highlight?: boolean;
+  period?: BillingPeriod;
 };
 
 export function PricingCheckoutButton({
   plan,
   label,
   highlight = false,
+  period = 'monthly',
 }: Props): React.ReactElement {
   const [open, setOpen] = useState(false);
 
   if (plan === 'free') {
     return (
-      <Link
-        href="/login"
-        className="mt-8 inline-flex items-center justify-center gap-1.5 rounded-md bg-green-500 px-4 py-2.5 text-sm font-medium text-zinc-950 transition hover:bg-green-400"
-      >
+      <Link href="/login" className="btn-senix btn-senix-primary mt-7 w-full !h-auto py-3">
         {label}
         <ArrowRight size={15} />
       </Link>
@@ -34,14 +34,12 @@ export function PricingCheckoutButton({
   }
 
   return (
-    <div className="mt-8 flex flex-col gap-2">
+    <div className="mt-7 flex flex-col gap-2">
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`inline-flex items-center justify-center gap-1.5 rounded-md px-4 py-2.5 text-sm font-medium transition ${
-          highlight
-            ? 'bg-green-500 text-zinc-950 hover:bg-green-400'
-            : 'border border-zinc-700 text-zinc-100 hover:border-zinc-600 hover:bg-zinc-800/40'
+        className={`btn-senix w-full !h-auto py-3 ${
+          highlight ? 'btn-senix-primary' : 'btn-senix-secondary'
         }`}
       >
         <ArrowRight size={15} />
@@ -50,6 +48,7 @@ export function PricingCheckoutButton({
       {open && (
         <WhopCheckoutDialog
           plan={plan as PaidPlan}
+          period={period}
           loginRedirect="/pricing"
           onClose={() => setOpen(false)}
         />

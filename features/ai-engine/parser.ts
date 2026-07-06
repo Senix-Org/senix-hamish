@@ -1,116 +1,33 @@
-import { Parser, Language } from 'web-tree-sitter';
-import type { Tree } from 'web-tree-sitter';
+import { createRequire } from 'node:module';
+import type Parser from 'tree-sitter';
 
 export type SupportedLanguage = 'javascript' | 'typescript' | 'tsx' | 'python';
 
 /**
- * Parsing is backed by web-tree-sitter (the WebAssembly build), which runs
- * in every runtime Senix uses: the Cloudflare Workers isolate, next dev,
- * vitest, and the standalone Node worker. The old native tree-sitter addon
- * could not load in workerd at all, so structural diffs on Cloudflare
- * degraded to no symbol detail.
- *
- * The WASM binaries live in public/wasm/ (checked in, copied from the
- * web-tree-sitter runtime and the prebuilt tree-sitter-wasms grammars).
- * They are static assets served next to the app, NOT part of the Worker
- * bundle. Loading is runtime-adaptive:
- *   1. Node (vitest, next dev, the worker): read the bytes from
- *      public/wasm/ on disk.
- *   2. Workers (no filesystem): fetch the bytes from the app's own public
- *      URL, where the ASSETS binding serves them.
- * Everything is cached at module scope, so each isolate/process pays the
- * load cost once per language.
- *
- * All failures degrade gracefully: parseFile resolves null and the
- * structural diff reports no symbol detail, never a crashed review.
+ * tree-sitter and its grammars are native Node addons (.node binaries).
+ * They load fine in a real Node.js process (the standalone worker, next dev,
+ * vitest) but cannot load in the Cloudflare Workers runtime, which has no
+ * native addon support. All loading is therefore lazy and guarded: when the
+ * addon cannot be loaded, parseFile returns null and the structural diff
+ * degrades to "no symbol detail" instead of crashing the route at import
+ * time.
  */
 
-let initPromise: Promise<boolean> | null = null;
-const languageCache = new Map<SupportedLanguage, Promise<Language | null>>();
 const parserCache: Partial<Record<SupportedLanguage, Parser>> = {};
 
-/** Grammar wasm filename (under public/wasm/) per supported language. */
-const GRAMMAR_FILES: Record<SupportedLanguage, string> = {
-  javascript: 'tree-sitter-javascript.wasm',
-  typescript: 'tree-sitter-typescript.wasm',
-  tsx: 'tree-sitter-tsx.wasm',
-  python: 'tree-sitter-python.wasm',
-};
+let nativeUnavailable = false;
 
 /**
- * Load a wasm file's bytes. Tries the local filesystem first (Node
- * runtimes), then falls back to fetching the app's own /wasm/ static asset
- * (Workers runtime, where node:fs has no real files). Returns null when
- * neither path works.
+ * Require a module through an indirection that bundlers (Next/OpenNext
+ * esbuild) cannot statically analyze, so the native addons are neither
+ * bundled nor build-time errors. In a real Node.js runtime this resolves
+ * from node_modules; in the Workers runtime createRequire exists under
+ * nodejs_compat but cannot resolve unbundled modules, so it throws and
+ * callers degrade gracefully.
  */
-async function loadWasmBytes(filename: string): Promise<Uint8Array | null> {
-  try {
-    const [{ readFile }, { join }] = await Promise.all([
-      import('node:fs/promises'),
-      import('node:path'),
-    ]);
-    return new Uint8Array(await readFile(join(process.cwd(), 'public', 'wasm', filename)));
-  } catch {
-    // No filesystem (or file missing): fall through to fetch.
-  }
-
-  try {
-    // Deferred import to avoid a module cycle at load time.
-    const { getAppBaseUrl } = await import('@features/shared/mcp-config');
-    const response = await fetch(`${getAppBaseUrl()}/wasm/${filename}`);
-    if (!response.ok) {
-      console.warn(`[parser] wasm fetch failed for ${filename}: HTTP ${response.status}`);
-      return null;
-    }
-    return new Uint8Array(await response.arrayBuffer());
-  } catch (err) {
-    console.warn(
-      `[parser] wasm unavailable for ${filename}: ${err instanceof Error ? err.message : String(err)}`
-    );
-    return null;
-  }
-}
-
-/** Initialize the web-tree-sitter runtime once. Resolves false on failure. */
-function initParserRuntime(): Promise<boolean> {
-  if (!initPromise) {
-    initPromise = (async () => {
-      const wasmBinary = await loadWasmBytes('tree-sitter.wasm');
-      if (!wasmBinary) return false;
-      try {
-        await Parser.init({ wasmBinary });
-        return true;
-      } catch (err) {
-        console.warn(
-          `[parser] web-tree-sitter init failed: ${err instanceof Error ? err.message : String(err)}`
-        );
-        return false;
-      }
-    })();
-  }
-  return initPromise;
-}
-
-/** Load and cache a language grammar. Resolves null when unavailable. */
-function getLanguage(language: SupportedLanguage): Promise<Language | null> {
-  let cached = languageCache.get(language);
-  if (!cached) {
-    cached = (async () => {
-      if (!(await initParserRuntime())) return null;
-      const bytes = await loadWasmBytes(GRAMMAR_FILES[language]);
-      if (!bytes) return null;
-      try {
-        return await Language.load(bytes);
-      } catch (err) {
-        console.warn(
-          `[parser] grammar load failed for ${language}: ${err instanceof Error ? err.message : String(err)}`
-        );
-        return null;
-      }
-    })();
-    languageCache.set(language, cached);
-  }
-  return cached;
+function dynamicRequire(name: string): unknown {
+  const req = createRequire(import.meta.url);
+  return req(name);
 }
 
 /**
@@ -140,29 +57,60 @@ export function detectLanguage(filename: string): SupportedLanguage | null {
   }
 }
 
+function getParser(language: SupportedLanguage): Parser | null {
+  const cached = parserCache[language];
+  if (cached) return cached;
+  if (nativeUnavailable) return null;
+
+  try {
+    const ParserCtor = dynamicRequire('tree-sitter') as new () => Parser;
+    const parser = new ParserCtor();
+
+    switch (language) {
+      case 'javascript':
+        parser.setLanguage(dynamicRequire('tree-sitter-javascript'));
+        break;
+      case 'typescript':
+        parser.setLanguage(
+          (dynamicRequire('tree-sitter-typescript') as { typescript: unknown }).typescript
+        );
+        break;
+      case 'tsx':
+        parser.setLanguage((dynamicRequire('tree-sitter-typescript') as { tsx: unknown }).tsx);
+        break;
+      case 'python':
+        parser.setLanguage(dynamicRequire('tree-sitter-python'));
+        break;
+    }
+
+    parserCache[language] = parser;
+    return parser;
+  } catch (err) {
+    if (!nativeUnavailable) {
+      nativeUnavailable = true;
+      console.warn(
+        '[parser] native tree-sitter unavailable in this runtime; structural diff will have no symbol detail',
+        { message: err instanceof Error ? err.message : String(err) }
+      );
+    }
+    return null;
+  }
+}
+
 /**
  * Parse source code into a tree-sitter Tree using the appropriate grammar.
- * The runtime and grammars are loaded lazily and cached per language.
+ * Parsers are loaded lazily and cached per language.
  *
  * @param content - The source code to parse.
  * @param language - The language grammar to use.
- * @returns The resulting Tree, or `null` if parsing fails or the wasm
- *   runtime/grammar cannot be loaded.
+ * @returns The resulting tree-sitter Tree, or `null` if parsing fails or the
+ *   native parser cannot load in this runtime.
  */
-export async function parseFile(
-  content: string,
-  language: SupportedLanguage
-): Promise<Tree | null> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function parseFile(content: string, language: SupportedLanguage): any {
   try {
-    const lang = await getLanguage(language);
-    if (!lang) return null;
-
-    let parser = parserCache[language];
-    if (!parser) {
-      parser = new Parser();
-      parser.setLanguage(lang);
-      parserCache[language] = parser;
-    }
+    const parser = getParser(language);
+    if (!parser) return null;
     return parser.parse(content);
   } catch {
     return null;

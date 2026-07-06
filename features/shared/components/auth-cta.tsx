@@ -80,12 +80,15 @@ export function MobileAuthCta(): React.ReactElement {
 }
 
 /** Hero CTA: "Go to dashboard" when signed in, else "Get started free". */
-export function HeroAuthCta(): React.ReactElement {
+export function HeroAuthCta({ trae = false }: { trae?: boolean } = {}): React.ReactElement {
   const loggedIn = useLoggedIn();
+  const traeClass =
+    'trae-btn trae-btn-brand inline-flex h-10 min-w-[96px] items-center justify-center rounded-md bg-[var(--trae-brand)] px-6 text-sm font-medium tracking-wide text-[#0a0b0d] hover:bg-[var(--trae-brand-hover)] xl:h-16 xl:px-7 xl:text-base';
+  const defaultClass =
+    'btn-senix btn-senix-primary inline-flex items-center justify-center gap-1.5 px-5 !h-auto py-3 text-sm';
+
   if (loggedIn) {
-    return (
-      <DashboardLink className="btn-senix btn-senix-primary inline-flex items-center justify-center gap-1.5 px-5 !h-auto py-3 text-sm" />
-    );
+    return <DashboardLink className={`group ${trae ? traeClass : defaultClass}`} />;
   }
-  return <SignInButton label="Get started free" variant="hero" />;
+  return <SignInButton label="Get started free" variant={trae ? 'trae' : 'hero'} />;
 }

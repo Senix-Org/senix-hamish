@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { SiteNav } from '@features/shared/components/site-nav';
-import { SiteFooter } from '@features/shared/components/site-footer';
+import { TraeFooterSection } from '@features/marketing/components/trae/footer-section';
 import { Reveal } from '@features/shared/components/reveal';
 import { createServerSupabaseClient } from '@features/shared/supabase-server';
 import { Playground } from '@features/ai-engine/components/playground';
@@ -46,7 +46,7 @@ export default async function PlaygroundPage(): Promise<React.ReactElement> {
           </div>
         </Reveal>
       </main>
-      <SiteFooter />
+      <TraeFooterSection />
     </>
   );
 }

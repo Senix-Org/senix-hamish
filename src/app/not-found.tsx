@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { SiteNav } from '@features/shared/components/site-nav';
-import { SiteFooter } from '@features/shared/components/site-footer';
+import { TraeFooterSection } from '@features/marketing/components/trae/footer-section';
 
 /**
  * Brand-consistent 404 page. Same nav and footer as the rest of the
@@ -43,7 +43,7 @@ export default function NotFound(): React.ReactElement {
           </div>
         </div>
       </main>
-      <SiteFooter />
+      <TraeFooterSection />
     </>
   );
 }

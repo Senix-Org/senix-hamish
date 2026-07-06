@@ -1,50 +1,68 @@
 import type { Metadata } from 'next';
 import {
-  DocH1,
+  DocCallout,
   DocH2,
   DocH3,
-  DocLead,
-  DocP,
+  DocNextLink,
   DocOL,
+  DocP,
+  DocPageHeader,
+  DocSteps,
+  DocStep,
   DocTable,
   InlineCode,
 } from '@features/shared/components/docs/doc-elements';
 import { getAppBaseUrl } from '@features/shared/mcp-config';
+import { buildMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Installing the GitHub App — Senix Docs',
+export const metadata: Metadata = buildMetadata({
+  title: 'Installing the GitHub App',
   description: 'Step-by-step guide to installing the Senix GitHub App.',
-};
+  path: '/docs/installation',
+});
 
 export default function InstallationPage(): React.ReactElement {
   return (
     <>
-      <DocH1>Installing the GitHub App</DocH1>
-      <DocLead>
-        The GitHub App is the fastest way to get Senix running — once installed, every pull
-        request in your selected repositories gets reviewed automatically.
-      </DocLead>
+      <DocPageHeader
+        title="Installing the GitHub App"
+        lead={
+          <>
+            The GitHub App is the fastest way to get Senix running. Once installed, every pull
+            request in your selected repositories gets reviewed automatically.
+          </>
+        }
+      />
 
       <DocH2>Step-by-step</DocH2>
-      <DocOL>
-        <li>
-          Sign in to Senix at{' '}
-          <InlineCode>{getAppBaseUrl().replace(/^https?:\/\//, '')}</InlineCode>.
-        </li>
-        <li>
-          Click <strong>Install GitHub App</strong> from your dashboard.
-        </li>
-        <li>Choose where to install — your personal account or an organization.</li>
-        <li>Select repositories — all repositories, or a specific subset.</li>
-        <li>Authorize the requested permissions.</li>
-        <li>
+      <DocSteps>
+        <DocStep step={1} title="Sign in to Senix">
+          Go to{' '}
+          <InlineCode>{getAppBaseUrl().replace(/^https?:\/\//, '')}</InlineCode> and sign in
+          with your GitHub account.
+        </DocStep>
+        <DocStep step={2} title="Install the app">
+          Click <strong className="text-primary">Install GitHub App</strong> from your
+          dashboard.
+        </DocStep>
+        <DocStep step={3} title="Choose account">
+          Select your personal account or an organization.
+        </DocStep>
+        <DocStep step={4} title="Select repositories">
+          Choose all repositories or a specific subset.
+        </DocStep>
+        <DocStep step={5} title="Authorize permissions">
+          Approve the requested permissions. Senix never writes to your code.
+        </DocStep>
+        <DocStep step={6} title="Done">
           You&apos;ll land on a confirmation page and be redirected back to your dashboard.
-        </li>
-      </DocOL>
-      <DocP>
-        Organization installs require admin permission. If you are not an owner on the
-        organization, GitHub will route the install through an approval flow.
-      </DocP>
+        </DocStep>
+      </DocSteps>
+
+      <DocCallout variant="info" title="Organization installs">
+        Organization installs require admin permission. If you are not an owner, GitHub
+        routes the install through an approval flow.
+      </DocCallout>
 
       <DocH2>Required permissions</DocH2>
       <DocP>
@@ -69,20 +87,27 @@ export default function InstallationPage(): React.ReactElement {
       <DocH3>Uninstall the GitHub App</DocH3>
       <DocOL>
         <li>
-          Go to <InlineCode>github.com/settings/installations</InlineCode> — or the
+          Go to <InlineCode>github.com/settings/installations</InlineCode>, or the
           organization equivalent under your org settings.
         </li>
         <li>
-          Find <strong>Senix-bot</strong> in the list.
+          Find <strong className="text-primary">Senix-bot</strong> in the list.
         </li>
         <li>
-          Click <strong>Configure</strong>, then <strong>Uninstall</strong>.
+          Click <strong className="text-primary">Configure</strong>, then{' '}
+          <strong className="text-primary">Uninstall</strong>.
         </li>
       </DocOL>
       <DocP>
         Uninstalling pauses all analysis immediately. Your history is soft-deleted, so
         reinstalling later restores it.
       </DocP>
+
+      <DocNextLink
+        href="/docs/how-it-works"
+        label="How Senix analyzes pull requests"
+        description="The pipeline, structural diffs, and supported languages."
+      />
     </>
   );
 }

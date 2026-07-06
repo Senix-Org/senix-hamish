@@ -1,12 +1,20 @@
 import type { Metadata } from 'next';
-import { DocH1, DocLead, DocP, CodeBlock } from '@features/shared/components/docs/doc-elements';
+import {
+  CodeBlock,
+  DocBadge,
+  DocH3,
+  DocP,
+  DocPageHeader,
+} from '@features/shared/components/docs/doc-elements';
+import { buildMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Risk flag reference — Senix Docs',
+export const metadata: Metadata = buildMetadata({
+  title: 'Risk flag reference',
   description: 'The 8 Senix risk flags, what each catches, and example triggering code.',
-};
+  path: '/docs/risk-flags',
+});
 
-type Severity = 'High' | 'Medium' | 'Low';
+type Severity = 'high' | 'medium';
 
 type Flag = {
   name: string;
@@ -23,7 +31,7 @@ const FLAGS: Flag[] = [
     example: `// Triggers sql-injection
 const email = req.query.email;
 db.query("SELECT * FROM users WHERE email = '" + email + "'");`,
-    severity: 'High',
+    severity: 'high',
   },
   {
     name: 'auth-change',
@@ -34,7 +42,7 @@ export function deleteUser(req, res) {
 -  if (req.user.role !== 'admin') return res.status(403).end();
    db.users.delete(req.params.id);
 }`,
-    severity: 'High',
+    severity: 'high',
   },
   {
     name: 'removed-validation',
@@ -46,7 +54,7 @@ export function createOrder(payload) {
 -  return db.orders.insert(data);
 +  return db.orders.insert(payload);
 }`,
-    severity: 'High',
+    severity: 'high',
   },
   {
     name: 'hardcoded-secret',
@@ -54,7 +62,7 @@ export function createOrder(payload) {
       'An API key, token, password, or private key written literally in source code instead of read from an environment variable or secret store.',
     example: `// Triggers hardcoded-secret
 const stripe = new Stripe("live_REPLACE_WITH_YOUR_KEY");`,
-    severity: 'High',
+    severity: 'high',
   },
   {
     name: 'new-external-api',
@@ -65,7 +73,7 @@ await fetch("https://api.analytics.io/v1/track", {
   method: "POST",
   body: JSON.stringify({ event: "signup", userId }),
 });`,
-    severity: 'Medium',
+    severity: 'medium',
   },
   {
     name: 'dependency-added',
@@ -75,7 +83,7 @@ await fetch("https://api.analytics.io/v1/track", {
 import { format } from "date-fns";
 
 export const stamp = () => format(new Date(), "yyyy-MM-dd");`,
-    severity: 'Medium',
+    severity: 'medium',
   },
   {
     name: 'payment-logic-change',
@@ -86,7 +94,7 @@ function applyDiscount(total, code) {
 -  return code === "SAVE10" ? total * 0.9 : total;
 +  return code === "SAVE10" ? total * 0.5 : total;
 }`,
-    severity: 'High',
+    severity: 'high',
   },
   {
     name: 'data-leak',
@@ -97,53 +105,49 @@ app.get("/api/users/:id", async (req, res) => {
   const user = await db.users.find(req.params.id);
   res.json(user); // user includes password_hash
 });`,
-    severity: 'High',
+    severity: 'high',
   },
 ];
-
-const SEVERITY_STYLES: Record<Severity, string> = {
-  High: 'bg-red-500/10 text-red-300 border-red-900/50',
-  Medium: 'bg-amber-500/10 text-amber-300 border-amber-900/50',
-  Low: 'bg-zinc-500/10 text-zinc-300 border-zinc-700',
-};
 
 export default function RiskFlagsPage(): React.ReactElement {
   return (
     <>
-      <DocH1>Risk flag reference</DocH1>
-      <DocLead>
-        Senix uses a fixed taxonomy of 8 risk flags. This page documents each one with
-        examples.
-      </DocLead>
+      <DocPageHeader
+        badge={<DocBadge>8 flags</DocBadge>}
+        title="Risk flag reference"
+        lead={
+          <>
+            Senix uses a fixed taxonomy of 8 risk flags. The model is instructed to use only
+            these names and to omit a flag when nothing fits, rather than invent a new one.
+          </>
+        }
+      />
+
       <DocP>
-        The model is instructed to use only these flag names and to omit a flag when nothing
-        fits, rather than invent a new one. The same taxonomy applies to both GitHub PR
-        reviews and MCP analyses.
+        The same taxonomy applies to both GitHub PR reviews and MCP analyses, so risk levels
+        stay comparable across surfaces.
       </DocP>
 
-      <div className="mt-8 space-y-12">
+      <div className="mt-10 space-y-10">
         {FLAGS.map((flag) => (
-          <section key={flag.name}>
-            <h2 className="text-2xl font-semibold scroll-mt-6 flex items-center gap-3">
-              <code className="font-mono text-base bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-green-400">
+          <section
+            key={flag.name}
+            className="rounded-xl border border-surface-border bg-surface p-5 sm:p-6"
+          >
+            <div className="flex flex-wrap items-center gap-3">
+              <code className="rounded-md border border-surface-border bg-surface-raised px-2.5 py-1 font-mono text-sm text-accent">
                 {flag.name}
               </code>
-            </h2>
-
-            <h3 className="text-xl font-semibold mt-8 mb-3">What it catches</h3>
-            <p className="text-zinc-300 leading-relaxed">{flag.catches}</p>
-
-            <h3 className="text-xl font-semibold mt-8 mb-3">Example</h3>
-            <CodeBlock>{flag.example}</CodeBlock>
-
-            <h3 className="text-xl font-semibold mt-8 mb-3">Severity</h3>
-            <p className="mt-1">
-              <span
-                className={`inline-flex items-center rounded-md border px-2.5 py-1 text-sm font-medium ${SEVERITY_STYLES[flag.severity]}`}
-              >
+              <DocBadge variant={flag.severity}>
                 {flag.severity} by default
-              </span>
-            </p>
+              </DocBadge>
+            </div>
+
+            <DocH3>What it catches</DocH3>
+            <DocP>{flag.catches}</DocP>
+
+            <DocH3>Example</DocH3>
+            <CodeBlock>{flag.example}</CodeBlock>
           </section>
         ))}
       </div>

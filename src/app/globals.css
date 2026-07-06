@@ -1,4 +1,19 @@
 @import "tailwindcss";
+@import "../../features/marketing/styles/trae.css" layer(components);
+
+/* TRAE outline CTAs must stay white on the dark landing page. */
+.trae-site a.trae-btn-outline {
+  color: #f5f9fe;
+}
+
+.trae-site a.trae-btn-outline:hover {
+  color: #f5f9fe;
+}
+
+.trae-site [data-testimonials-desc],
+.trae-site [data-cta-desc] {
+  color: #ffffff;
+}
 
 :root {
   /* Cool near-black with a whisper of green (Supabase-deep, not mint). */
@@ -92,15 +107,39 @@ body {
   gap: 0.5rem;
   height: 2.25rem;
   padding: 0 0.9rem;
-  border-radius: 0.375rem;
+  border-radius: 0.625rem;
   font-weight: 600;
   font-size: 0.8125rem;
   white-space: nowrap;
   border: 1px solid transparent;
-  transition: background 0.14s, border-color 0.14s, filter 0.14s, transform 0.05s;
+  transition:
+    background 0.14s,
+    border-color 0.14s,
+    filter 0.14s,
+    transform 0.18s,
+    box-shadow 0.18s;
 }
 .btn-senix:active {
   transform: translateY(0.5px);
+}
+
+.marketing-btn:hover {
+  transform: translateY(-1px) scale(1.02);
+}
+
+.marketing-btn:focus-visible {
+  outline: 2px solid rgba(34, 197, 94, 0.65);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-btn:hover {
+    transform: none;
+  }
+
+  .marketing-card:hover {
+    transform: none !important;
+  }
 }
 
 .btn-senix-primary {
@@ -144,12 +183,13 @@ body {
   border-radius: 0.875rem;
   overflow: hidden;
   background: var(--color-surface);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02) inset;
 }
 .repo-row {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
+  gap: 0.875rem;
+  padding: 0.875rem 1.125rem;
   border-bottom: 1px solid rgba(150, 170, 158, 0.055);
   transition: background 0.12s;
 }
@@ -248,4 +288,286 @@ body {
 
 .no-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome, Safari */
+}
+
+/* Marketing landing polish */
+.nav-link:focus-visible {
+  outline: none;
+}
+
+.nav-link-underline {
+  transform-origin: left center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-visual-skeleton {
+    animation: none;
+  }
+
+  .hero-preview-frame {
+    transform: none !important;
+  }
+}
+
+/* Hero product preview: subtle 3D perspective on hover */
+.hero-preview-perspective {
+  perspective: 1200px;
+}
+
+.hero-preview-frame {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.hero-section {
+  background-color: #0a0a0b;
+}
+
+/* TRAE.ai hero layout (Senix copy + brand colors) — https://www.trae.ai/ */
+:root {
+  --senix-brand: #32f08c;
+  --senix-brand-hover: #0fdc78;
+  --trae-header-height: 64px;
+  --trae-bg: #0a0b0d;
+  --trae-text: #f5f9fe;
+  --trae-text-secondary: #a6aab5;
+}
+
+.trae-hero {
+  background: var(--trae-bg);
+  min-height: calc(100dvh - var(--trae-header-height));
+  position: relative;
+  overflow: hidden;
+}
+
+.trae-hero-bg-grid {
+  background-image: radial-gradient(rgba(150, 170, 158, 0.055) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: 0 0;
+  opacity: 0.55;
+}
+
+.trae-hero-bg-glow {
+  background: radial-gradient(
+    ellipse at center,
+    rgba(50, 240, 140, 0.2) 0%,
+    rgba(50, 240, 140, 0.06) 42%,
+    transparent 72%
+  );
+  filter: blur(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trae-hero-bg-grid,
+  .trae-hero-bg-glow {
+    animation: none !important;
+  }
+}
+
+.trae-hero-inner {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 1600px);
+  min-height: calc(100dvh - var(--trae-header-height));
+  margin-inline: auto;
+  padding-inline: 16px;
+  padding-bottom: 16px;
+}
+
+@media (min-width: 744px) {
+  .trae-hero-inner {
+    padding-inline: 24px;
+    padding-bottom: 24px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .trae-hero-inner {
+    padding-inline: 32px;
+    padding-bottom: 32px;
+  }
+}
+
+.trae-hero-topline {
+  align-self: stretch;
+  height: 1px;
+  margin-bottom: 8px;
+  margin-top: 36px;
+  background: hsla(0, 0%, 100%, 0.18);
+}
+
+@media (min-width: 744px) {
+  .trae-hero-topline {
+    margin-bottom: 20px;
+  }
+}
+
+.trae-hero-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+@media (min-width: 744px) {
+  .trae-hero-body {
+    flex-direction: row;
+    margin-top: auto;
+  }
+}
+
+.trae-hero-bottom {
+  padding-top: 32px;
+  padding-bottom: 8px;
+}
+
+.trae-hero-bottom-row {
+  width: 100%;
+}
+
+.trae-hero-corner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  align-self: flex-end;
+  max-width: 578px;
+  margin-left: auto;
+  text-align: right;
+}
+
+.trae-hero-main {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 24px;
+}
+
+@media (min-width: 744px) {
+  .trae-hero-main {
+    flex: 631 1;
+    max-width: 631px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .trae-hero-main {
+    flex: 723 1;
+    max-width: 723px;
+  }
+}
+
+.trae-hero-titlebox {
+  font-size: 42px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+@media (min-width: 744px) {
+  .trae-hero-titlebox {
+    font-size: 56px;
+    line-height: 1.12;
+  }
+}
+
+@media (min-width: 1280px) {
+  .trae-hero-titlebox {
+    font-size: 72px;
+    line-height: 1.08;
+  }
+}
+
+.trae-hero-title2 {
+  color: var(--trae-text-secondary);
+}
+
+.trae-hero-title1 {
+  color: var(--trae-text);
+}
+
+.trae-hero-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding-bottom: 24px;
+}
+
+@media (min-width: 744px) {
+  .trae-hero-side {
+    flex: 377 1;
+    align-items: flex-end;
+  }
+}
+
+@media (min-width: 1280px) {
+  .trae-hero-side {
+    flex: 496 1;
+    padding-right: 24px;
+  }
+}
+
+.trae-hero-desc {
+  display: flex;
+  flex-direction: column;
+  max-width: 578px;
+  margin-bottom: 8px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--trae-text);
+  text-align: right;
+  align-items: flex-end;
+}
+
+.trae-hero-desc p {
+  text-align: right;
+}
+
+@media (min-width: 744px) {
+  .trae-hero-desc {
+    text-align: right;
+    align-items: flex-end;
+  }
+
+  .trae-hero-desc p {
+    text-align: right;
+  }
+}
+
+.trae-hero-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  align-self: flex-end;
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--trae-text-secondary);
+  transition: color 0.15s;
+}
+
+.trae-hero-link:hover {
+  color: var(--trae-text);
+}
+
+.trae-nav-shell {
+  height: var(--trae-header-height);
+  background: var(--trae-bg);
+}
+
+.trae-nav-inner {
+  width: min(100%, 1600px);
+  margin-inline: auto;
+  padding-inline: 16px;
+}
+
+@media (min-width: 744px) {
+  .trae-nav-inner {
+    padding-inline: 24px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .trae-nav-inner {
+    padding-inline: 32px;
+  }
 }

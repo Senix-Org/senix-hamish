@@ -1,18 +1,30 @@
 import Link from 'next/link';
-import { GitPullRequest, Plus, AlertTriangle, Ban } from 'lucide-react';
+import {
+  Activity,
+  AlertTriangle,
+  Ban,
+  CreditCard,
+  GitBranch,
+  GitPullRequest,
+  Plug,
+  Plus,
+} from 'lucide-react';
 import { createServerSupabaseClient } from '@features/shared/supabase-server';
 import { RecentAnalyses } from '@features/dashboard/components/recent-analyses';
 import { RealtimeReviews } from '@features/dashboard/components/realtime-reviews';
 import type { AnalysisCardData } from '@features/dashboard/components/analysis-card';
+import {
+  DashboardQuickLink,
+  DashboardSection,
+  DashboardStatCard,
+  DashboardUsageMeter,
+} from '@features/dashboard/components/dashboard-ui';
+import { DashboardPageHeader } from '@features/dashboard/components/page-header';
 import RepoToggle from '@features/dashboard/components/repo-toggle';
 import { getGithubAppInstallUrl } from '@features/github-integration/install-url';
 import { currentAppUserId } from '@features/auth/mcp-tokens';
 import { getUserPlan } from '@features/billing/plan-limits';
 
-/**
- * Deterministic accent dot per repo so the list reads at a glance without
- * needing real language data. Stable for a given name across renders.
- */
 const REPO_DOT_COLORS = ['#3ecf8e', '#76a7d6', '#e0a23a', '#c98bdb', '#f0616a', '#5fc9b8'];
 function repoDotColor(name: string): string {
   let hash = 0;
@@ -47,12 +59,6 @@ type RepoRow = {
   enabled: boolean;
 };
 
-/**
- * Customer dashboard overview. Reads the signed-in user's recent
- * analyses and connected repos through the user-context Supabase client
- * (so RLS enforces ownership). The /dashboard layout has already bounced
- * any unauthenticated visitor to /login by the time we get here.
- */
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -83,9 +89,7 @@ export default async function DashboardPage({
   const analyses = (analysesResult.data ?? []) as unknown as AnalysisRow[];
   const repos = (reposResult.data ?? []) as unknown as RepoRow[];
 
-  // Plan usage for the limit banner. Non-fatal: if the plan can't be read
-  // (e.g. brand-new account before its users row settles) we just skip it.
-  let usage: { used: number; limit: number; percent: number } | null = null;
+  let usage: { used: number; limit: number; percent: number; planLabel: string } | null = null;
   try {
     const userId = await currentAppUserId();
     if (userId) {
@@ -96,6 +100,7 @@ export default async function DashboardPage({
           used: plan.tokensUsed,
           limit,
           percent: Math.min(100, Math.round((plan.tokensUsed / limit) * 100)),
+          planLabel: plan.effectiveLimit.label,
         };
       }
     }
@@ -104,12 +109,11 @@ export default async function DashboardPage({
   }
 
   const enabledRepoCount = repos.filter((r) => r.enabled).length;
-  // Server Component: rendered once per request, so reading the clock here
-  // is deterministic for this render. Hoisted out of the filter for clarity.
   const nowMs = Date.now(); // eslint-disable-line react-hooks/purity
   const weeklyAnalysisCount = analyses.filter(
     (a) => nowMs - new Date(a.created_at).getTime() < 7 * 24 * 60 * 60 * 1000
   ).length;
+  const highRiskCount = analyses.filter((a) => a.risk_level === 'high').length;
 
   const analysisCards: AnalysisCardData[] = analyses.map((a) => ({
     id: a.id,
@@ -127,14 +131,22 @@ export default async function DashboardPage({
 
   return (
     <div>
-      <header>
-        <h1 className="text-3xl font-semibold text-primary">Your reviews at a glance</h1>
-        <p className="mt-2 text-sm text-secondary">
-          {enabledRepoCount} {enabledRepoCount === 1 ? 'repo' : 'repos'} connected,{' '}
-          {weeklyAnalysisCount} {weeklyAnalysisCount === 1 ? 'analysis' : 'analyses'} this
-          week
-        </p>
-      </header>
+      <DashboardPageHeader
+        eyebrow="Overview"
+        title="Your reviews at a glance"
+        description={
+          <>
+            {enabledRepoCount} {enabledRepoCount === 1 ? 'repo' : 'repos'} connected ·{' '}
+            {weeklyAnalysisCount} {weeklyAnalysisCount === 1 ? 'analysis' : 'analyses'} this week
+          </>
+        }
+        action={
+          <Link href="/dashboard/reviews" className="btn-senix btn-senix-secondary">
+            <GitPullRequest size={15} strokeWidth={2} />
+            All reviews
+          </Link>
+        }
+      />
 
       {usage && usage.percent >= 80 && <UsageLimitBanner usage={usage} />}
 
@@ -152,20 +164,72 @@ export default async function DashboardPage({
         </div>
       )}
 
-      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Total reviews" value={analyses.length} />
-        <StatCard label="This week" value={weeklyAnalysisCount} />
-        <StatCard label="Repos connected" value={enabledRepoCount} />
+      <div className="mt-8 flex flex-col gap-4 lg:flex-row">
+        {usage && (
+          <div className="lg:flex-1">
+            <DashboardUsageMeter
+              used={usage.used}
+              limit={usage.limit}
+              planLabel={usage.planLabel}
+            />
+          </div>
+        )}
+        <div className={`flex flex-wrap gap-3 ${usage ? 'lg:flex-1' : 'w-full'}`}>
+          <DashboardQuickLink
+            href={installUrl}
+            title="Connect repo"
+            description="Install the GitHub App on a new repository"
+            icon={GitBranch}
+            external
+          />
+          <DashboardQuickLink
+            href="/dashboard/connect"
+            title="Connect IDE"
+            description="Set up MCP in Cursor or Claude Code"
+            icon={Plug}
+          />
+          <DashboardQuickLink
+            href="/dashboard/billing"
+            title="Billing"
+            description="Manage plan and token limits"
+            icon={CreditCard}
+          />
+        </div>
       </div>
 
-      <section className="mt-8">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-primary">Connected repositories</h2>
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <DashboardStatCard label="Total reviews" value={analyses.length} icon={GitPullRequest} />
+        <DashboardStatCard
+          label="This week"
+          value={weeklyAnalysisCount}
+          icon={Activity}
+          hint="Last 7 days"
+        />
+        <DashboardStatCard
+          label="High risk"
+          value={highRiskCount}
+          icon={AlertTriangle}
+          hint="In recent list"
+        />
+        <DashboardStatCard
+          label="Repos active"
+          value={enabledRepoCount}
+          icon={GitBranch}
+          hint={`${repos.length} connected`}
+        />
+      </div>
+
+      <DashboardSection
+        className="mt-10"
+        title="Connected repositories"
+        description="Toggle repos on or off without uninstalling the GitHub App."
+        action={
           <a href={installUrl} className="btn-senix btn-senix-secondary">
             <Plus size={15} strokeWidth={2} />
             Connect repo
           </a>
-        </div>
+        }
+      >
         {repos.length === 0 ? (
           <ReposEmptyState installUrl={installUrl} />
         ) : (
@@ -174,24 +238,42 @@ export default async function DashboardPage({
               <div key={repo.id} className="repo-row">
                 <span
                   className="repo-dot"
-                  style={{ background: repoDotColor(repo.full_name), color: repoDotColor(repo.full_name) }}
+                  style={{
+                    background: repoDotColor(repo.full_name),
+                    color: repoDotColor(repo.full_name),
+                  }}
                   aria-hidden
                 />
-                <span className="truncate font-mono text-sm text-primary">{repo.full_name}</span>
-                <div className="ml-auto flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate font-mono text-sm text-primary">
+                    {repo.full_name}
+                  </span>
                   <span className="text-xs text-muted">{repo.enabled ? 'Active' : 'Paused'}</span>
-                  <RepoToggle repoId={repo.id} enabled={repo.enabled} />
                 </div>
+                <RepoToggle repoId={repo.id} enabled={repo.enabled} />
               </div>
             ))}
           </div>
         )}
-      </section>
+      </DashboardSection>
 
-      <section className="mt-8">
-        <h2 className="mb-4 text-lg font-semibold text-primary">Recent analyses</h2>
+      <DashboardSection
+        className="mt-10"
+        title="Recent analyses"
+        description="Latest reviews across your connected repositories."
+        action={
+          analyses.length > 0 ? (
+            <Link
+              href="/dashboard/reviews"
+              className="text-sm text-accent hover:text-accent-hover"
+            >
+              View all
+            </Link>
+          ) : undefined
+        }
+      >
         {analyses.length === 0 ? <AnalysesEmptyState /> : <RecentAnalyses analyses={analysisCards} />}
-      </section>
+      </DashboardSection>
 
       <RealtimeReviews />
     </div>
@@ -229,22 +311,16 @@ function UsageLimitBanner({
   );
 }
 
-function StatCard({ label, value }: { label: string; value: number }): React.ReactElement {
-  return (
-    <div className="rounded-xl border border-surface-border bg-surface p-6">
-      <div className="text-2xl font-bold tabular-nums text-primary">{value}</div>
-      <div className="mt-1 text-xs uppercase tracking-wider text-secondary">{label}</div>
-    </div>
-  );
-}
-
 function ReposEmptyState({ installUrl }: { installUrl: string }): React.ReactElement {
   return (
     <div className="repo-list">
-      <div className="flex flex-col items-center px-6 py-12 text-center">
-        <p className="text-sm font-medium text-primary">No repos connected yet</p>
+      <div className="flex flex-col items-center px-6 py-14 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-surface-border bg-surface-raised text-muted">
+          <GitBranch size={22} strokeWidth={1.5} />
+        </div>
+        <p className="mt-4 text-sm font-medium text-primary">No repos connected yet</p>
         <p className="mt-1 max-w-xs text-sm text-secondary">
-          Connect your first repo to start getting reviews.
+          Connect your first repo to start getting automatic PR reviews.
         </p>
         <a href={installUrl} className="btn-senix btn-senix-primary mt-5">
           <Plus size={15} strokeWidth={2} />
@@ -257,11 +333,13 @@ function ReposEmptyState({ installUrl }: { installUrl: string }): React.ReactEle
 
 function AnalysesEmptyState(): React.ReactElement {
   return (
-    <div className="flex flex-col items-center py-12 text-center">
-      <GitPullRequest size={32} strokeWidth={1.5} className="text-muted" />
+    <div className="flex flex-col items-center rounded-xl border border-dashed border-surface-border bg-surface/50 py-14 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-surface-border bg-surface-raised text-muted">
+        <GitPullRequest size={22} strokeWidth={1.5} />
+      </div>
       <p className="mt-4 text-sm font-medium text-primary">No reviews yet</p>
       <p className="mt-1 max-w-xs text-sm text-secondary">
-        Open a pull request in a connected repo and Senix will review it within 30 seconds.
+        Open a pull request in a connected repo. Senix usually reviews within 20–40 seconds.
       </p>
     </div>
   );

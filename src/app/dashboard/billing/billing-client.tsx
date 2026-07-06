@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Check, CreditCard, Loader2, Sparkles, X, Zap } from 'lucide-react';
+import { DashboardPageHeader } from '@features/dashboard/components/page-header';
 import { WhopCheckoutDialog } from '@/components/whop-checkout-dialog';
 
 const BILLING_PERIOD_KEY = 'senix-billing-period';
@@ -109,13 +110,6 @@ export function BillingClient({ planData, tiers }: Props): React.ReactElement {
   );
   const tokenProgressTone =
     tokenProgress >= 100 ? 'bg-risk-high' : tokenProgress >= 80 ? 'bg-amber-500' : 'bg-accent';
-  // Usage is DISPLAYED as a percentage only; the raw counts stay in the data
-  // and are surfaced through title tooltips for anyone who wants them.
-  const usagePercent = Math.min(
-    Math.round((currentPlanData.tokensUsed / Math.max(currentPlanData.tokenLimit, 1)) * 100),
-    100
-  );
-  const usageTitle = `${currentPlanData.tokensUsed.toLocaleString()} of ${currentPlanData.tokenLimit.toLocaleString()} tokens used`;
 
   function startCheckout(plan: BillingPlanName): void {
     if (plan === 'free') return;
@@ -150,12 +144,11 @@ export function BillingClient({ planData, tiers }: Props): React.ReactElement {
 
   return (
     <div>
-      <header>
-        <h1 className="text-3xl font-semibold text-primary">Billing</h1>
-        <p className="mt-2 text-sm text-secondary">
-          Manage your plan and track usage for this billing cycle.
-        </p>
-      </header>
+      <DashboardPageHeader
+        eyebrow="Account"
+        title="Billing"
+        description="Manage your plan and track token usage for this billing cycle."
+      />
 
       {/* Current plan */}
       <section className="mt-8 rounded-xl border border-surface-border bg-surface p-6">
@@ -204,8 +197,9 @@ export function BillingClient({ planData, tiers }: Props): React.ReactElement {
         <div className="mt-6">
           <div className="flex items-center justify-between text-sm">
             <span className="text-secondary">Tokens used this month</span>
-            <span className="tabular-nums text-primary" title={usageTitle}>
-              {usagePercent}% used
+            <span className="tabular-nums text-primary">
+              {currentPlanData.tokensUsed.toLocaleString()} /{' '}
+              {currentPlanData.tokenLimit.toLocaleString()} tokens
             </span>
           </div>
           <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-raised">
@@ -237,9 +231,8 @@ export function BillingClient({ planData, tiers }: Props): React.ReactElement {
         <StatCard
           icon={<Zap size={16} className="text-accent" />}
           label="Tokens used this month"
-          value={`${usagePercent}%`}
-          sub="of your monthly limit used"
-          title={usageTitle}
+          value={currentPlanData.tokensUsed.toLocaleString()}
+          sub={`of ${currentPlanData.tokenLimit.toLocaleString()} included`}
         />
         <StatCard
           icon={<Sparkles size={16} className="text-accent" />}
@@ -343,17 +336,14 @@ function StatCard({
   label,
   value,
   sub,
-  title,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   sub: string;
-  /** Optional hover tooltip carrying the raw numbers for power users. */
-  title?: string;
 }): React.ReactElement {
   return (
-    <div className="rounded-xl border border-surface-border bg-surface p-5" title={title}>
+    <div className="rounded-xl border border-surface-border bg-surface p-5">
       <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted">
         {icon}
         {label}
