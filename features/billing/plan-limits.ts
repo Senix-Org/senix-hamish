@@ -40,7 +40,12 @@ type UserPlanRow = {
 
 type LimitResult = { allowed: true } | { allowed: false; reason: string };
 
-const MAX_COUNTER_ATTEMPTS = 3;
+/**
+ * Up-front token estimate reserved per review at gate time. Shared by every
+ * flow (PR webhook, MCP, playground) so the post-LLM true-up in
+ * {@link recordTokenUsage} subtracts exactly what the gate reserved.
+ */
+export const ESTIMATED_TOKENS_PER_REVIEW = 2000;
 
 async function getSupabaseAdmin() {
   const { supabaseAdmin } = await import('@features/shared/supabase');
@@ -158,10 +163,23 @@ export async function getUserPlan(userId: string): Promise<UserPlan> {
 }
 
 /**
- * Pre-flight token budget gate. Returns blocked when the user's current
- * monthly usage plus the estimated cost of this review would exceed their
- * plan's token budget. Does not mutate usage — the actual count is recorded
- * after the LLM completes via {@link recordTokenUsage}.
+ * Token budget gate. Atomically checks AND reserves the estimate against the
+ * user's monthly budget via the increment_token_usage RPC (migration 012):
+ * the user row is locked FOR UPDATE, so concurrent reviews cannot all read
+ * the same pre-call usage and collectively exceed the budget. When blocked,
+ * nothing is debited.
+ *
+ * The monthly counter reset runs first (inside getUserPlan), BEFORE the RPC,
+ * so the reservation always lands in the current period. Note on the reset:
+ * it is idempotent (concurrent resets write the same zero and period start)
+ * but it is a plain unconditional update, so exactly at a month boundary a
+ * reset racing an in-flight increment can drop that increment. That
+ * pre-existing boundary race is documented here, not fixed, to keep this
+ * change scoped to the gate itself.
+ *
+ * After the LLM completes, {@link recordTokenUsage} trues usage up from the
+ * reserved estimate to the actual count. If a review dies between the two
+ * calls the estimate stays debited, which errs on the conservative side.
  */
 export async function checkTokenLimit(
   userId: string,
@@ -173,7 +191,21 @@ export async function checkTokenLimit(
   const limit = userPlan.effectiveLimit.tokens;
   const estimate = Math.max(0, Math.round(estimatedTokens));
 
-  if (userPlan.tokensUsed + estimate > limit) {
+  const supabase = await getSupabaseAdmin();
+  const { data, error } = (await supabase.rpc('increment_token_usage', {
+    user_id: userId,
+    tokens_to_add: estimate,
+    monthly_limit: limit,
+  })) as unknown as {
+    data: { allowed: boolean } | null;
+    error: { message: string } | null;
+  };
+
+  if (error) {
+    throw new Error(`Failed to check token budget: ${error.message}`);
+  }
+
+  if (!data?.allowed) {
     return {
       allowed: false,
       reason: `Monthly token budget reached for the ${userPlan.effectiveLimit.label} plan.`,
@@ -184,48 +216,41 @@ export async function checkTokenLimit(
 }
 
 /**
- * Record actual token usage after a review completes. This is the source of
- * truth for monthly usage. Increments `tokens_used_this_month` by the real
- * token count using optimistic locking with retries, so concurrent reviews
- * cannot clobber each other's increments.
+ * True usage up to the actual token count after a review completes. The gate
+ * already debited `reservedTokens` (the estimate), so this applies the
+ * difference (actual - reserved) in a single atomic UPDATE via the
+ * adjust_token_usage RPC — no read-modify-write, no retry loop, no lost
+ * increments. The adjustment is never blocked by the budget (the spend
+ * already happened) and the counter floors at zero when actual < reserved.
  */
 export async function recordTokenUsage(
   userId: string,
   actualTokens: number,
   // Kept for symmetry/observability; the budget is a single shared pool.
-  _source: TokenSource
+  _source: TokenSource,
+  /** Estimate already debited by the checkTokenLimit gate; 0 if none was. */
+  reservedTokens = 0
 ): Promise<number> {
-  const tokens = Math.max(0, Math.round(actualTokens));
-  if (tokens === 0) {
+  const actual = Math.max(0, Math.round(actualTokens));
+  const reserved = Math.max(0, Math.round(reservedTokens));
+  const delta = actual - reserved;
+
+  if (delta === 0) {
     const plan = await getUserPlan(userId);
     return plan.tokensUsed;
   }
 
-  for (let attempt = 0; attempt < MAX_COUNTER_ATTEMPTS; attempt += 1) {
-    const userPlan = await getUserPlan(userId);
-    const nextValue = userPlan.tokensUsedThisMonth + tokens;
+  const supabase = await getSupabaseAdmin();
+  const { data, error } = (await supabase.rpc('adjust_token_usage', {
+    user_id: userId,
+    delta,
+  })) as unknown as { data: number | null; error: { message: string } | null };
 
-    const supabase = await getSupabaseAdmin();
-    const { data, error } = (await supabase
-      .from('users')
-      .update({ tokens_used_this_month: nextValue })
-      .eq('id', userId)
-      .eq('tokens_used_this_month', userPlan.tokensUsedThisMonth)
-      .select('id')
-      .maybeSingle()) as unknown as {
-      data: { id: string } | null;
-      error: { message: string } | null;
-    };
-
-    if (error) {
-      throw new Error(`Failed to record token usage: ${error.message}`);
-    }
-    if (data) {
-      return nextValue;
-    }
+  if (error) {
+    throw new Error(`Failed to record token usage: ${error.message}`);
   }
 
-  throw new Error('Token usage changed concurrently while recording. Increment not applied.');
+  return data ?? 0;
 }
 
 export async function checkRepoLimit(userId: string): Promise<LimitResult> {

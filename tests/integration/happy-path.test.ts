@@ -54,6 +54,7 @@ vi.mock('@features/review-queue/queue', () => ({ claimAnalysis, releaseAnalysisC
 vi.mock('@features/billing/plan-limits', () => ({
   isOverRepoLimit: vi.fn().mockResolvedValue(false),
   recordTokenUsage: vi.fn().mockResolvedValue(0),
+  ESTIMATED_TOKENS_PER_REVIEW: 2000,
 }));
 
 import { processAnalyzePr } from '@features/review-queue/worker/analyze-pr';

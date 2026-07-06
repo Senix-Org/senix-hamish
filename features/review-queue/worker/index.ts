@@ -6,6 +6,10 @@ import { log } from './log';
 const POLL_INTERVAL_MS = 2000;
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 const HEARTBEAT_INTERVAL_MS = 60_000;
+// Concurrency cap on simultaneous job processing (each job is one LLM call,
+// which costs money and consumes provider rate limit). Tune against the
+// DeepSeek rate limits; 5 is a conservative starting point.
+const MAX_CONCURRENT_JOBS = 5;
 
 const REQUIRED_ENV_VARS = [
   'UPSTASH_REDIS_REST_URL',
@@ -20,7 +24,7 @@ const REQUIRED_ENV_VARS = [
 ] as const;
 
 let shuttingDown = false;
-let inFlight = 0;
+let activeJobs = 0;
 let processedCount = 0;
 let failedCount = 0;
 let heartbeatTimer: NodeJS.Timeout | null = null;
@@ -76,17 +80,35 @@ async function processJob(job: Job): Promise<void> {
   }
 }
 
+/**
+ * Semaphore-wrapped processing: activeJobs counts jobs currently in flight
+ * and the loop refuses to dequeue while at MAX_CONCURRENT_JOBS, so a burst
+ * of queued jobs can never fan out into unbounded concurrent LLM calls.
+ *
+ * The capacity check happens BEFORE dequeue() on purpose (a deliberate
+ * deviation from "dequeue then skip"): dequeue() atomically moves the job
+ * into the processing list, so skipping after dequeue would strand the job
+ * there instead of leaving it queued for the next poll.
+ */
+function processWithSemaphore(job: Job): void {
+  activeJobs++;
+  processJob(job).finally(() => {
+    activeJobs--;
+  });
+}
+
 async function loop(): Promise<void> {
   while (!shuttingDown) {
+    if (activeJobs >= MAX_CONCURRENT_JOBS) {
+      await sleep(POLL_INTERVAL_MS);
+      continue;
+    }
     const job = await dequeue();
     if (!job) {
       await sleep(POLL_INTERVAL_MS);
       continue;
     }
-    inFlight++;
-    processJob(job).finally(() => {
-      inFlight--;
-    });
+    processWithSemaphore(job);
   }
 }
 
@@ -105,7 +127,7 @@ function startHeartbeat(): void {
     log.info('heartbeat', {
       processed: processedCount,
       failed: failedCount,
-      inFlight,
+      activeJobs,
     });
   }, HEARTBEAT_INTERVAL_MS);
 }
@@ -118,13 +140,13 @@ function setupShutdown(): void {
       clearInterval(heartbeatTimer);
       heartbeatTimer = null;
     }
-    log.info('shutting down', { signal, draining: inFlight });
+    log.info('shutting down', { signal, draining: activeJobs });
     const start = Date.now();
-    while (inFlight > 0 && Date.now() - start < SHUTDOWN_TIMEOUT_MS) {
+    while (activeJobs > 0 && Date.now() - start < SHUTDOWN_TIMEOUT_MS) {
       await sleep(200);
     }
-    if (inFlight > 0) {
-      log.warn('forced exit', { inFlight });
+    if (activeJobs > 0) {
+      log.warn('forced exit', { activeJobs });
     } else {
       log.info('clean exit', { processed: processedCount, failed: failedCount });
     }

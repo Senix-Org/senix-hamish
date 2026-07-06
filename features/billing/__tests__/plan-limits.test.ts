@@ -1,16 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
- * Proves the token-budget rate limiting: a user is blocked once their
- * monthly token usage (plus the estimate for this review) would exceed the
- * plan budget, allowed while under it, usage is recorded by the ACTUAL token
- * count (not the estimate) with optimistic locking, the monthly counter
- * auto-resets, and the repo limit is enforced.
+ * Proves the token-budget rate limiting: the gate atomically checks AND
+ * reserves the estimate via the increment_token_usage RPC (so concurrent
+ * reviews cannot all pass and collectively exceed the budget), the post-LLM
+ * true-up adjusts usage by (actual - reserved) in a single atomic RPC (no
+ * lost increments), the monthly counter auto-resets before the gate, and
+ * the repo limit is enforced.
  * Failure means: users could consume unlimited paid LLM capacity, or usage
  * accounting would drift from reality.
  */
 
-const { maybeSingle, update } = vi.hoisted(() => ({ maybeSingle: vi.fn(), update: vi.fn() }));
+const { maybeSingle, update, rpc } = vi.hoisted(() => ({
+  maybeSingle: vi.fn(),
+  update: vi.fn(),
+  rpc: vi.fn(),
+}));
 
 const builder: Record<string, unknown> = {};
 builder.select = () => builder;
@@ -23,7 +28,7 @@ builder.is = () => builder;
 builder.maybeSingle = maybeSingle;
 
 vi.mock('@features/shared/supabase', () => ({
-  supabaseAdmin: { from: () => builder },
+  supabaseAdmin: { from: () => builder, rpc },
 }));
 
 import {
@@ -55,77 +60,104 @@ function freeUser(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   maybeSingle.mockReset();
   update.mockReset();
+  rpc.mockReset();
 });
 
-describe('checkTokenLimit (free plan)', () => {
-  it('allows when usage plus the estimate is under the budget', async () => {
+describe('checkTokenLimit (atomic reserve via RPC)', () => {
+  it('allows and reserves the estimate when the RPC accepts it', async () => {
     maybeSingle.mockResolvedValueOnce({ data: freeUser({ tokens_used_this_month: 1000 }), error: null });
+    rpc.mockResolvedValueOnce({ data: { allowed: true, new_usage: 3000 }, error: null });
+
     const res = await checkTokenLimit('user-1', 2000, 'pr');
+
     expect(res.allowed).toBe(true);
+    expect(rpc).toHaveBeenCalledWith('increment_token_usage', {
+      user_id: 'user-1',
+      tokens_to_add: 2000,
+      monthly_limit: PLAN_LIMITS.free.tokens,
+    });
   });
 
-  it('blocks when usage plus the estimate would exceed the budget', async () => {
+  it('blocks when the RPC reports the estimate would exceed the budget', async () => {
     maybeSingle.mockResolvedValueOnce({
       data: freeUser({ tokens_used_this_month: PLAN_LIMITS.free.tokens - 500 }),
       error: null,
     });
+    rpc.mockResolvedValueOnce({
+      data: { allowed: false, current_usage: PLAN_LIMITS.free.tokens - 500, limit: PLAN_LIMITS.free.tokens },
+      error: null,
+    });
+
     const res = await checkTokenLimit('user-1', 2000, 'pr');
     expect(res.allowed).toBe(false);
     if (!res.allowed) expect(res.reason).toMatch(/token budget reached/i);
   });
 
-  it('does not mutate usage on a pre-check (no increment)', async () => {
-    maybeSingle.mockResolvedValueOnce({ data: freeUser({ tokens_used_this_month: 0 }), error: null });
-    await checkTokenLimit('user-1', 2000, 'mcp');
-    expect(update).not.toHaveBeenCalled();
+  it('throws on an RPC error so the gate never silently passes', async () => {
+    maybeSingle.mockResolvedValueOnce({ data: freeUser(), error: null });
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'db down' } });
+    await expect(checkTokenLimit('user-1', 2000, 'mcp')).rejects.toThrow(/token budget/i);
   });
 });
 
-describe('recordTokenUsage', () => {
-  it('increments by the ACTUAL token count, not the estimate', async () => {
-    // 1st maybeSingle: getUserPlan; 2nd: the optimistic update returning a row.
-    maybeSingle
-      .mockResolvedValueOnce({ data: freeUser({ tokens_used_this_month: 1000 }), error: null })
-      .mockResolvedValueOnce({ data: { id: 'user-1' }, error: null });
+describe('recordTokenUsage (atomic true-up)', () => {
+  it('adjusts by ACTUAL minus RESERVED in one atomic RPC', async () => {
+    rpc.mockResolvedValueOnce({ data: 4500, error: null });
+
+    const total = await recordTokenUsage('user-1', 3500, 'pr', 2000);
+
+    expect(total).toBe(4500);
+    expect(rpc).toHaveBeenCalledWith('adjust_token_usage', { user_id: 'user-1', delta: 1500 });
+    // No read-modify-write on the users table anymore.
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('applies a negative delta when actual usage came in under the estimate', async () => {
+    rpc.mockResolvedValueOnce({ data: 500, error: null });
+
+    const total = await recordTokenUsage('user-1', 1000, 'mcp', 2000);
+
+    expect(total).toBe(500);
+    expect(rpc).toHaveBeenCalledWith('adjust_token_usage', { user_id: 'user-1', delta: -1000 });
+  });
+
+  it('skips the RPC entirely when actual equals reserved (delta 0)', async () => {
+    maybeSingle.mockResolvedValueOnce({ data: freeUser({ tokens_used_this_month: 2000 }), error: null });
+
+    const total = await recordTokenUsage('user-1', 2000, 'pr', 2000);
+
+    expect(total).toBe(2000);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('increments by the full actual count when nothing was reserved', async () => {
+    rpc.mockResolvedValueOnce({ data: 3500, error: null });
 
     const total = await recordTokenUsage('user-1', 3500, 'pr');
 
-    expect(total).toBe(4500);
-    expect(update).toHaveBeenCalledWith({ tokens_used_this_month: 4500 });
-  });
-
-  it('retries on a lost optimistic race, then succeeds', async () => {
-    maybeSingle
-      // attempt 1: read, then update returns null (someone else won)
-      .mockResolvedValueOnce({ data: freeUser({ tokens_used_this_month: 1000 }), error: null })
-      .mockResolvedValueOnce({ data: null, error: null })
-      // attempt 2: read fresh value, update succeeds
-      .mockResolvedValueOnce({ data: freeUser({ tokens_used_this_month: 1200 }), error: null })
-      .mockResolvedValueOnce({ data: { id: 'user-1' }, error: null });
-
-    const total = await recordTokenUsage('user-1', 100, 'pr');
-    expect(total).toBe(1300);
+    expect(total).toBe(3500);
+    expect(rpc).toHaveBeenCalledWith('adjust_token_usage', { user_id: 'user-1', delta: 3500 });
   });
 });
 
 describe('monthly reset', () => {
-  it('zeroes tokens_used_this_month when the reset timestamp is before this month', async () => {
-    // getUserPlan sees a stale reset date and issues a reset update, then the
-    // record increment starts from zero.
-    maybeSingle
-      .mockResolvedValueOnce({
-        data: freeUser({ tokens_used_this_month: 9999, tokens_reset_at: lastMonth }),
-        error: null,
-      })
-      .mockResolvedValueOnce({ data: { id: 'user-1' }, error: null });
+  it('zeroes tokens_used_this_month BEFORE the gate reserves', async () => {
+    // getUserPlan sees a stale reset date and issues a reset update; the
+    // gate RPC then reserves against the fresh period.
+    maybeSingle.mockResolvedValueOnce({
+      data: freeUser({ tokens_used_this_month: 9999, tokens_reset_at: lastMonth }),
+      error: null,
+    });
+    rpc.mockResolvedValueOnce({ data: { allowed: true, new_usage: 2000 }, error: null });
 
-    const total = await recordTokenUsage('user-1', 200, 'pr');
+    const res = await checkTokenLimit('user-1', 2000, 'pr');
 
-    // First update is the monthly reset to 0; the increment then starts at 0.
+    expect(res.allowed).toBe(true);
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({ tokens_used_this_month: 0 })
     );
-    expect(total).toBe(200);
+    // The reset update must land before the reserve RPC runs.
+    expect(update.mock.invocationCallOrder[0]).toBeLessThan(rpc.mock.invocationCallOrder[0]);
   });
 });
 

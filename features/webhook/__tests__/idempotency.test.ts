@@ -1,49 +1,54 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
- * Proves: the idempotency guard reports a delivery as duplicate only when a
- * processed row already exists for that delivery id, and fails OPEN (not a
- * duplicate) on a DB read error so real webhooks are never dropped.
- * Failure means: GitHub retries would create duplicate analyses / comments,
- * or a transient DB error would wrongly suppress a legitimate delivery.
+ * Proves: the idempotency claim is the INSERT itself — the first request for
+ * a delivery id owns processing, a concurrent or later retry hits the unique
+ * violation (23505) and is reported as a duplicate, and any other insert
+ * error fails OPEN (claimed) so real webhooks are never dropped.
+ * Failure means: concurrent GitHub retries would create duplicate analyses
+ * and comments, or a transient DB error would suppress a legitimate delivery.
  */
 
-const maybeSingle = vi.fn();
+const single = vi.fn();
 
 vi.mock('@features/shared/supabase', () => ({
   supabaseAdmin: {
     from: () => ({
-      select: () => ({
-        eq: () => ({
-          eq: () => ({ maybeSingle }),
-        }),
-      }),
+      insert: () => ({ select: () => ({ single }) }),
+      update: () => ({ eq: () => Promise.resolve({ data: null, error: null }) }),
     }),
   },
 }));
 
-import { isDuplicateDelivery } from '@features/webhook/idempotency';
+import { claimDelivery } from '@features/webhook/idempotency';
+
+const input = {
+  deliveryId: 'd-1',
+  eventType: 'pull_request',
+  action: 'opened',
+  payload: { action: 'opened' },
+};
 
 beforeEach(() => {
-  maybeSingle.mockReset();
+  single.mockReset();
 });
 
-describe('isDuplicateDelivery', () => {
-  it('returns true when a processed row already exists for the delivery id', async () => {
-    maybeSingle.mockResolvedValue({
-      data: { github_delivery_id: 'd-1', processed: true },
-      error: null,
+describe('claimDelivery', () => {
+  it('claims when the insert lands (first delivery of this id)', async () => {
+    single.mockResolvedValue({ data: { id: 'row-1' }, error: null });
+    expect(await claimDelivery(input)).toBe('claimed');
+  });
+
+  it('reports a duplicate on a unique violation (concurrent or earlier retry)', async () => {
+    single.mockResolvedValue({
+      data: null,
+      error: { code: '23505', message: 'duplicate key value violates unique constraint' },
     });
-    expect(await isDuplicateDelivery('d-1')).toBe(true);
+    expect(await claimDelivery(input)).toBe('duplicate');
   });
 
-  it('returns false when no prior processed row exists (first delivery)', async () => {
-    maybeSingle.mockResolvedValue({ data: null, error: null });
-    expect(await isDuplicateDelivery('d-new')).toBe(false);
-  });
-
-  it('fails open (returns false) when the lookup errors', async () => {
-    maybeSingle.mockResolvedValue({ data: null, error: { message: 'db down' } });
-    expect(await isDuplicateDelivery('d-err')).toBe(false);
+  it('fails open (claimed) on any other insert error', async () => {
+    single.mockResolvedValue({ data: null, error: { code: '57014', message: 'db down' } });
+    expect(await claimDelivery(input)).toBe('claimed');
   });
 });

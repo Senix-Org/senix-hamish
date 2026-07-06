@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
    import { verifyGithubSignature } from '@features/webhook/signature';
-   import { supabaseAdmin } from '@features/shared/supabase';
    import { routeEvent } from '@features/webhook/route-event';
-   import { isDuplicateDelivery } from '@features/webhook/idempotency';
+   import { claimDelivery, markDeliveryProcessed } from '@features/webhook/idempotency';
 
    export const runtime = 'nodejs';
    export const dynamic = 'force-dynamic';
@@ -42,21 +41,18 @@ import { NextRequest, NextResponse } from 'next/server';
        payload = { _parseError: true };
      }
 
-     // Log the event. Only verified deliveries reach this point, so
-     // signature_valid is always true on new rows; the column is kept for
-     // schema compatibility with rows logged before this ordering fix.
-     await supabaseAdmin.from('webhook_events').insert({
-       github_delivery_id: deliveryId,
-       event_type: eventType,
+     // Log the event AND claim the delivery id in one atomic insert. Only
+     // verified deliveries reach this point. github_delivery_id is UNIQUE,
+     // so when GitHub retries a delivery (even concurrently) exactly one
+     // request inserts the row and proceeds; the rest see the conflict and
+     // dedupe, so a retry can never produce a duplicate analysis or comment.
+     const claim = await claimDelivery({
+       deliveryId,
+       eventType,
        action: payload?.action ?? null,
        payload,
-       signature_valid: true,
      });
-
-     // Idempotency: GitHub retries deliveries with the same delivery id.
-     // If we've already processed this id, skip routing so we never produce
-     // a duplicate analysis or a duplicate PR comment.
-     if (await isDuplicateDelivery(deliveryId)) {
+     if (claim === 'duplicate') {
        return NextResponse.json({ ok: true, deduped: true });
      }
 
@@ -71,11 +67,8 @@ import { NextRequest, NextResponse } from 'next/server';
      }
    
      // Mark the event as processed
-     await supabaseAdmin
-       .from('webhook_events')
-       .update({ processed: true })
-       .eq('github_delivery_id', deliveryId);
-   
+     await markDeliveryProcessed(deliveryId);
+
      return NextResponse.json({ ok: true, result });
    }
    

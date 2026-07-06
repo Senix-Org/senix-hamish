@@ -9,7 +9,11 @@ import { upsertPRComment } from '@features/github-integration/github-comments';
 import type { JobPayloadMap } from '@features/review-queue/queue';
 import { claimAnalysis, releaseAnalysisClaim } from '@features/review-queue/queue';
 import { getAppBaseUrl } from '@features/shared/mcp-config';
-import { isOverRepoLimit, recordTokenUsage } from '@features/billing/plan-limits';
+import {
+  isOverRepoLimit,
+  recordTokenUsage,
+  ESTIMATED_TOKENS_PER_REVIEW,
+} from '@features/billing/plan-limits';
 
 const MAX_FILES_FOR_STRUCTURAL_DIFF = 50;
 const REPO_LIMIT_COMMENT = `This repository is over your Senix plan's repo limit, so Senix skipped this review. Upgrade or disconnect repos at ${getAppBaseUrl()}/dashboard/billing`;
@@ -181,11 +185,11 @@ export async function processAnalyzePr(
       })
       .eq('id', analysisId);
 
-    // Record actual token usage against the user's monthly budget (source of
-    // truth). Never fail the analysis over a usage-bookkeeping error.
+    // True usage up from the estimate the webhook gate reserved to the
+    // actual count. Never fail the analysis over a usage-bookkeeping error.
     if (userId && llmResult?.tokensUsed) {
       try {
-        await recordTokenUsage(userId, llmResult.tokensUsed, 'pr');
+        await recordTokenUsage(userId, llmResult.tokensUsed, 'pr', ESTIMATED_TOKENS_PER_REVIEW);
       } catch (usageErr) {
         console.error(`[analyze-pr] ${analysisId}: failed to record token usage`, usageErr);
       }

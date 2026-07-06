@@ -7,7 +7,11 @@ import {
   recordPlaygroundTokens,
 } from '@features/billing/playground-rate-limit';
 import { currentAppUserId } from '@features/auth/mcp-tokens';
-import { checkTokenLimit, recordTokenUsage } from '@features/billing/plan-limits';
+import {
+  checkTokenLimit,
+  recordTokenUsage,
+  ESTIMATED_TOKENS_PER_REVIEW,
+} from '@features/billing/plan-limits';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,9 +29,6 @@ export const dynamic = 'force-dynamic';
  */
 
 const MAX_DIFF_BYTES = 50 * 1024;
-// Conservative up-front estimate; the real token count is recorded after the
-// LLM responds.
-const ESTIMATED_TOKENS_PER_REVIEW = 2000;
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   let body: unknown;
@@ -104,7 +105,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // caller already earned over a usage-bookkeeping error.
     try {
       if (userId) {
-        await recordTokenUsage(userId, result.tokensUsed, 'playground');
+        await recordTokenUsage(userId, result.tokensUsed, 'playground', ESTIMATED_TOKENS_PER_REVIEW);
       } else {
         await recordPlaygroundTokens(ip, result.tokensUsed);
       }
