@@ -25,29 +25,33 @@ import { NextRequest, NextResponse } from 'next/server';
    
      const secret = process.env.GITHUB_WEBHOOK_SECRET!;
      const valid = verifyGithubSignature(rawBody, signature, secret);
-   
-     let payload: any = {};
-     try {
-       payload = JSON.parse(rawBody);
-     } catch {
-       payload = { _parseError: true };
-     }
-   
-     // Always log the event
-     await supabaseAdmin.from('webhook_events').insert({
-       github_delivery_id: deliveryId,
-       event_type: eventType,
-       action: payload?.action ?? null,
-       payload,
-       signature_valid: valid,
-     });
-   
+
+     // Reject BEFORE any database write. Logging unverified payloads would
+     // let any anonymous caller create webhook_events rows (storage abuse).
      if (!valid) {
        return NextResponse.json(
          { error: 'Invalid signature' },
          { status: 401 }
        );
      }
+
+     let payload: any = {};
+     try {
+       payload = JSON.parse(rawBody);
+     } catch {
+       payload = { _parseError: true };
+     }
+
+     // Log the event. Only verified deliveries reach this point, so
+     // signature_valid is always true on new rows; the column is kept for
+     // schema compatibility with rows logged before this ordering fix.
+     await supabaseAdmin.from('webhook_events').insert({
+       github_delivery_id: deliveryId,
+       event_type: eventType,
+       action: payload?.action ?? null,
+       payload,
+       signature_valid: true,
+     });
 
      // Idempotency: GitHub retries deliveries with the same delivery id.
      // If we've already processed this id, skip routing so we never produce

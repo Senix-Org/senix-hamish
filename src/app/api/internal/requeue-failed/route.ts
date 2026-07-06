@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@features/shared/supabase';
-import { enqueue } from '@features/review-queue/queue';
+import { enqueue, releaseAnalysisClaim } from '@features/review-queue/queue';
+import { verifyInternalAuth, internalUnauthorized } from '@/lib/internal-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,30 +30,6 @@ type RequeueResponse = {
 };
 
 /**
- * Validate the Basic Auth header against `INTERNAL_PASSWORD`.
- * Mirrors `src/middleware.ts` — needed inline because the matcher only covers
- * `/internal/:path*`, not `/api/internal/*`.
- */
-function isAuthorized(req: NextRequest): boolean {
-  const password = process.env.INTERNAL_PASSWORD;
-  if (!password) return true;
-  const auth = req.headers.get('authorization');
-  if (!auth) return false;
-  const [scheme, encoded] = auth.split(' ');
-  if (scheme !== 'Basic' || !encoded) return false;
-  const decoded = Buffer.from(encoded, 'base64').toString();
-  const [, providedPassword] = decoded.split(':');
-  return providedPassword === password;
-}
-
-function unauthorized(): NextResponse {
-  return new NextResponse('Authentication required', {
-    status: 401,
-    headers: { 'WWW-Authenticate': 'Basic realm="Internal"' },
-  });
-}
-
-/**
  * POST /api/internal/requeue-failed
  *
  * Requeue every analysis that failed in the last 24 hours. Mirrors the
@@ -60,7 +37,7 @@ function unauthorized(): NextResponse {
  * recovery flow without shelling out.
  */
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  if (!isAuthorized(req)) return unauthorized();
+  if (!verifyInternalAuth(req)) return internalUnauthorized();
 
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
@@ -105,6 +82,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const [owner, repoName] = pr.repositories.full_name.split('/');
+
+    // Clear any stale ownership claim before re-enqueuing. A failed run may
+    // have left its Redis claim behind (TTL up to an hour); without this the
+    // worker that picks the job up sees the claim, backs off, and the row
+    // stays stuck at 'queued'.
+    await releaseAnalysisClaim(analysis.id);
 
     await enqueue('analyze-pr', {
       analysisId: analysis.id,
