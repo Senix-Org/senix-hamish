@@ -1,5 +1,22 @@
 import { getInstallationOctokit } from '@features/github-integration/github-app';
 
+/**
+ * Branded footer appended to every comment Senix posts (reviews, limit
+ * notices, MCP-delivered reviews) — this function is the single choke point
+ * they all go through, so the branding can never be missed by a new comment
+ * type. Markdown so the senix.dev link is clickable on GitHub, separated
+ * from the review content by a horizontal rule.
+ */
+const SENIX_FOOTER = `\n\n---\n*Reviewed by [Senix](https://senix.dev) · AI code review for teams shipping with AI*`;
+
+/** Marker used to detect an existing footer so upserts never duplicate it. */
+const FOOTER_MARKER = 'Reviewed by [Senix]';
+
+export function addFooter(body: string): string {
+  if (body.includes(FOOTER_MARKER)) return body;
+  return `${body}${SENIX_FOOTER}`;
+}
+
 export type UpsertPRCommentInput = {
   installationId: number;
   owner: string;
@@ -32,7 +49,8 @@ type GithubCommentResponse = {
 export async function upsertPRComment(
   input: UpsertPRCommentInput
 ): Promise<UpsertPRCommentResult> {
-  const { installationId, owner, repo, prNumber, commentBody, existingCommentId } = input;
+  const { installationId, owner, repo, prNumber, existingCommentId } = input;
+  const commentBody = addFooter(input.commentBody);
   const octokit = getInstallationOctokit(installationId);
 
   if (existingCommentId !== null) {

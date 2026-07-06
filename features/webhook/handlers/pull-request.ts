@@ -4,6 +4,10 @@ import { enqueue, type JobPayloadMap } from '@features/review-queue/queue';
 import { processAnalyzePr } from '@features/review-queue/worker/analyze-pr';
 import { checkTokenLimit, ESTIMATED_TOKENS_PER_REVIEW } from '@features/billing/plan-limits';
 import { upsertPRComment } from '@features/github-integration/github-comments';
+import {
+  recordPROutcome,
+  incrementCommitsAfterReview,
+} from '@features/review-queue/outcome-recorder';
 import { getAppBaseUrl } from '@features/shared/mcp-config';
 import { findRepository } from './lookup';
 
@@ -36,13 +40,37 @@ type PullRequestPayload = {
     state?: string;
     head?: { sha?: string };
     base?: { sha?: string };
+    merged?: boolean;
+    merged_at?: string | null;
+    closed_at?: string | null;
   };
-  repository?: { id?: number };
+  repository?: { id?: number; full_name?: string };
   installation?: { id?: number };
 };
 
 export async function handlePullRequest(payload: PullRequestPayload): Promise<string> {
   const action = payload.action ?? '';
+
+  // Outcome bookkeeping (migration 014): a closed PR needs no analysis, but
+  // it labels the latest completed review — merged-despite-risk plus, on
+  // merge, the scheduled 24h hotfix scan. Best-effort: recordPROutcome
+  // catches its own errors and never affects webhook handling.
+  if (action === 'closed') {
+    const closedPr = payload.pull_request;
+    const fullName = payload.repository?.full_name;
+    if (closedPr?.number && fullName) {
+      await recordPROutcome({
+        prNumber: closedPr.number,
+        repoFullName: fullName,
+        merged: Boolean(closedPr.merged),
+        mergedAt: closedPr.merged_at ?? null,
+        closedAt: closedPr.closed_at ?? null,
+      });
+      return `pull_request:outcome-recorded:${fullName}#${closedPr.number}:${closedPr.merged ? 'merged' : 'closed'}`;
+    }
+    return 'pull_request:skipped:closed';
+  }
+
   if (!ACTIONS_WE_HANDLE.has(action)) {
     return `pull_request:skipped:${action}`;
   }
@@ -50,6 +78,16 @@ export async function handlePullRequest(payload: PullRequestPayload): Promise<st
   const pr = payload.pull_request;
   const repoPayload = payload.repository;
   const installationId = payload.installation?.id;
+
+  // New commits after a completed review are developer pushback — count them
+  // on the latest completed analysis before kicking off the re-review.
+  // Best-effort: never affects the review flow.
+  if (action === 'synchronize' && pr?.number && repoPayload?.full_name) {
+    await incrementCommitsAfterReview({
+      prNumber: pr.number,
+      repoFullName: repoPayload.full_name,
+    });
+  }
 
   if (
     !pr ||
