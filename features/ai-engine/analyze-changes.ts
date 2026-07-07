@@ -6,8 +6,8 @@ import type { AnalysisResult } from '@features/ai-engine/llm/types';
  * Shared change-analysis pipeline.
  *
  * Both the MCP `review_changes` tool and the public playground feed file
- * changes through the exact same path: tree-sitter structural diff, then
- * the shared LLM provider and analysis prompt. Keeping that path here (one
+ * changes through the exact same path: regex structural diff, then the
+ * shared LLM provider and analysis prompt. Keeping that path here (one
  * place, not duplicated per route) means the two surfaces cannot drift,
  * and the playground never has to call the MCP endpoint over HTTP.
  */
@@ -73,7 +73,7 @@ export async function analyzeFileChanges(
     // Empty string means "no such file on that side" (new file / deletion).
     const before = change.before === '' ? null : change.before;
     const after = change.after === '' ? null : change.after;
-    structuralDiff.push(await diffFile(change.file_path, before, after));
+    structuralDiff.push(diffFile(change.file_path, before, after));
 
     const delta = lineDelta(change.before, change.after);
     additions += delta.additions;

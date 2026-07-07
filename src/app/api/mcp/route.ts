@@ -26,7 +26,7 @@ const MAX_MCP_PAYLOAD_BYTES = 50 * 1024;
  * expose the `review_changes` tool to the developer's AI assistant. The
  * legacy name `analyze_code_changes` still works as an alias so older IDE
  * configs keep functioning. The tool reuses the exact same pipeline as the
- * GitHub bot — tree-sitter structural diff + the shared LLM provider + the
+ * GitHub bot — regex-based structural diff + the shared LLM provider + the
  * shared analysis prompt. Only the input source differs: a PR diff for the
  * bot, IDE-supplied file contents here.
  *
