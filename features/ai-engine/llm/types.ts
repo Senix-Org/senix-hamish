@@ -3,7 +3,7 @@ import type { PrMeta } from '@features/ai-engine/prompts/pr-analysis';
 
 export type RiskLevel = 'low' | 'medium' | 'high';
 
-export type ProviderName = 'anthropic' | 'gemini' | 'groq' | 'deepseek';
+export type ProviderName = 'anthropic' | 'gemini' | 'groq' | 'deepseek' | 'openrouter';
 
 export type FocusArea = {
   file: string;
