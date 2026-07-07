@@ -73,7 +73,7 @@ export async function analyzeFileChanges(
     // Empty string means "no such file on that side" (new file / deletion).
     const before = change.before === '' ? null : change.before;
     const after = change.after === '' ? null : change.after;
-    structuralDiff.push(diffFile(change.file_path, before, after));
+    structuralDiff.push(await diffFile(change.file_path, before, after));
 
     const delta = lineDelta(change.before, change.after);
     additions += delta.additions;

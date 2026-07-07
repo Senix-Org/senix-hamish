@@ -1,4 +1,4 @@
-import Parser from 'tree-sitter';
+import type { Tree, Node as SyntaxNode } from 'web-tree-sitter';
    import { SupportedLanguage } from './parser';
    
    export type SymbolKind = 'function' | 'method' | 'class' | 'const' | 'unknown';
@@ -39,7 +39,7 @@ import Parser from 'tree-sitter';
     * Implementation is per-language because each grammar names nodes differently.
     */
    export function extractSymbols(
-     tree: Parser.Tree,
+     tree: Tree,
      language: SupportedLanguage
    ): Symbol[] {
      const symbols: Symbol[] = [];
@@ -57,7 +57,7 @@ import Parser from 'tree-sitter';
    
    function pushSymbol(
      symbols: Symbol[],
-     node: Parser.SyntaxNode,
+     node: SyntaxNode,
      name: string,
      kind: SymbolKind,
      prefix: string
@@ -75,8 +75,9 @@ import Parser from 'tree-sitter';
      });
    }
    
-   function walkJsTs(node: Parser.SyntaxNode, symbols: Symbol[], prefix: string) {
+   function walkJsTs(node: SyntaxNode, symbols: Symbol[], prefix: string) {
      for (const child of node.namedChildren) {
+       if (!child) continue;
        const type = child.type;
    
        if (type === 'function_declaration') {
@@ -94,7 +95,7 @@ import Parser from 'tree-sitter';
        } else if (type === 'lexical_declaration' || type === 'variable_declaration') {
          // const foo = ... or let foo = ...
          for (const declarator of child.namedChildren) {
-           if (declarator.type === 'variable_declarator') {
+           if (declarator?.type === 'variable_declarator') {
              const name = declarator.childForFieldName('name')?.text ?? '';
              if (name) pushSymbol(symbols, child, name, 'const', prefix);
            }
@@ -106,8 +107,9 @@ import Parser from 'tree-sitter';
      }
    }
    
-   function walkPython(node: Parser.SyntaxNode, symbols: Symbol[], prefix: string) {
+   function walkPython(node: SyntaxNode, symbols: Symbol[], prefix: string) {
      for (const child of node.namedChildren) {
+       if (!child) continue;
        const type = child.type;
    
        if (type === 'function_definition') {

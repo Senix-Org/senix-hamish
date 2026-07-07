@@ -4,6 +4,7 @@ import { createHash, randomBytes } from 'crypto';
 import { revalidatePath } from 'next/cache';
 import { createServerSupabaseClient } from '@features/shared/supabase-server';
 import { supabaseAdmin } from '@features/shared/supabase';
+import { MAX_TOKENS_PER_USER } from '@/lib/constants';
 
 const TOKEN_PREFIX = 'sk_mcp_';
 const MIN_NAME_LEN = 2;
@@ -48,6 +49,26 @@ export async function generateMcpToken(name: string): Promise<GenerateResult> {
   const userId = await currentAppUserId();
   if (!userId) {
     return { ok: false, error: 'Not signed in.' };
+  }
+
+  // Same live-token cap as the API route (/api/mcp/token). Counting only
+  // non-revoked rows: revoking a token on this page soft-revokes (sets
+  // revoked_at), so revoking frees a slot.
+  const { count, error: countError } = await supabaseAdmin
+    .from('mcp_tokens')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .is('revoked_at', null);
+
+  if (countError) {
+    return { ok: false, error: countError.message };
+  }
+
+  if (count !== null && count >= MAX_TOKENS_PER_USER) {
+    return {
+      ok: false,
+      error: `Maximum of ${MAX_TOKENS_PER_USER} tokens allowed. Please revoke an existing token first.`,
+    };
   }
 
   const token = TOKEN_PREFIX + randomBytes(16).toString('hex');
