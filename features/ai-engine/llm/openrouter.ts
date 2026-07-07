@@ -28,7 +28,10 @@ const MODEL = 'deepseek/deepseek-v4-flash';
 const FALLBACK_MODEL = 'openai/gpt-oss-120b:free';
 const BASE_URL = 'https://openrouter.ai/api/v1';
 const TEMPERATURE = 0.1;
-const MAX_TOKENS = 1000;
+// 2000, not the spec's original 1000: the schema output (summary, risky
+// files, verification steps) easily passes 1000 tokens on large PRs, and a
+// truncated response fails JSON parsing and burns the fallback attempt.
+const MAX_TOKENS = 2000;
 const REQUEST_TIMEOUT_MS = 60_000;
 
 /**
