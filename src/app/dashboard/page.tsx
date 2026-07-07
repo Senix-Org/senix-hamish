@@ -299,10 +299,13 @@ function UsageLimitBanner({
       ) : (
         <AlertTriangle size={16} className="shrink-0 text-risk-medium" />
       )}
-      <span className="flex-1">
+      <span
+        className="flex-1"
+        title={`${usage.used.toLocaleString()} of ${usage.limit.toLocaleString()} tokens used`}
+      >
         {blocked
-          ? `You've used all your tokens for this month (${usage.used.toLocaleString()} of ${usage.limit.toLocaleString()}). Upgrade to continue getting reviews.`
-          : `You've used ${usage.percent}% of your token budget this month (${usage.used.toLocaleString()} of ${usage.limit.toLocaleString()}).`}
+          ? `You've used all your tokens for this month. Upgrade to continue getting reviews.`
+          : `You've used ${usage.percent}% of your token budget this month.`}
       </span>
       <Link href="/dashboard/billing" className="btn-senix btn-senix-secondary shrink-0">
         Upgrade
