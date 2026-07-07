@@ -1,4 +1,3 @@
-import { createHmac, timingSafeEqual } from 'crypto';
 import type { PlanName } from '@features/billing/plan-limits';
 
 export type PaidPlanName = Exclude<PlanName, 'free'>;
@@ -81,24 +80,6 @@ export function planForWhopProductId(productId: string | null | undefined): Paid
   ];
 
   return entries.find(([, id]) => id === productId)?.[0] ?? null;
-}
-
-export function verifyWhopSignature(rawBody: string, signature: string | null): boolean {
-  const secret = process.env.WHOP_WEBHOOK_SECRET;
-  if (!secret || !signature) return false;
-
-  const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
-  const candidates = signature
-    .split(',')
-    .map((part) => part.trim())
-    .flatMap((part) => {
-      if (part.startsWith('sha256=')) return [part.slice('sha256='.length)];
-      if (part.startsWith('v1=')) return [part.slice('v1='.length)];
-      return [part];
-    })
-    .filter((part) => /^[a-f0-9]{64}$/i.test(part));
-
-  return candidates.some((candidate) => safeEqualHex(candidate, expected));
 }
 
 export async function createWhopCheckoutLink(input: {
@@ -319,13 +300,6 @@ function numberOrEmptyEquals(value: unknown, expected: number): boolean {
   }
 
   return numberEquals(value, expected);
-}
-
-function safeEqualHex(left: string, right: string): boolean {
-  const leftBuffer = Buffer.from(left, 'hex');
-  const rightBuffer = Buffer.from(right, 'hex');
-  if (leftBuffer.length !== rightBuffer.length) return false;
-  return timingSafeEqual(leftBuffer, rightBuffer);
 }
 
 async function readJson(response: Response): Promise<unknown> {

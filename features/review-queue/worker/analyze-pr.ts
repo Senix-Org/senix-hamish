@@ -125,7 +125,7 @@ export async function processAnalyzePr(
               file.status === 'removed'
                 ? null
                 : await fetchFileContent(installationId, owner, repo, file.filename, headSha);
-            return diffFile(file.filename, beforeContent, afterContent);
+            return await diffFile(file.filename, beforeContent, afterContent);
           })
         );
         structural.push(...batchResults);
