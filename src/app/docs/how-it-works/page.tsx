@@ -24,8 +24,8 @@ export default function HowItWorksPage(): React.ReactElement {
         title="How Senix analyzes pull requests"
         lead={
           <>
-            Every review runs through the same pipeline: a webhook kicks it off, tree-sitter
-            builds a structural diff, and the LLM turns that into a behavioral summary.
+            Every review runs through the same pipeline: a webhook kicks it off, regex-based
+            symbol detection builds a structural diff, and the LLM turns that into a behavioral summary.
           </>
         }
       />
