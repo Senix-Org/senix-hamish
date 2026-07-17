@@ -352,6 +352,44 @@ CAVEAT: the OpenNext build cannot be verified on this Windows box (known); the
 custom worker.ts entry + workflows binding get their first real verification in
 the GitHub Actions deploy. If the deploy fails, look there first.
 
+## Workflows migration VERIFIED end to end in production (2026-07-17)
+
+After two merge mishaps (PR #19 merged at a stale head missing the init fix, then
+landed via PR #20; deploy run 41 success), test PR #21 validated the new path live:
+
+1. Webhook response: "pull_request:reopened:Senix-Org/senix#21:workflow-dispatched"
+   (read from the GitHub App delivery log via the app API).
+2. wrangler workflows instances list senix-analyze-pr: one instance, id
+   2ca554cd-8ec0-4280-994a-74da3ecb3b1d, exactly the analysis row id, Completed.
+3. Analysis row completed in 21s with tokens_used 2308 and a posted PR comment.
+   Architecture line above ("dispatched via after()") is now outdated: production
+   dispatch is the ANALYZE_PR_WORKFLOW binding; after() and Redis remain fallbacks.
+
+Also found and fixed during validation: the first PR #21 open was denied
+"limit-reached" because 13 stranded analyses this month each held a 2,000-token
+reservation that was never trued up (the waitUntil kills happened before refund),
+putting installer user senix-dev at 48,046/50,000. Refunded exactly 26,000 via
+adjust_token_usage (now 22,046). Note for the future: stranded/failed analyses leak
+their reservation; the Workflow's failure path does not refund either (only marks
+failed). Consider a refund in mark-analysis-failed or a watchdog-side refund.
+
+## Backlog — next up (2026-07-18, do first)
+
+1. TOKEN RESERVATION LEAK — own PR, planned 2026-07-17 night, execute fresh:
+   refund token reservations on all non-success analysis terminations (the
+   Workflow mark-analysis-failed step, processAnalyzePr catch/fallback paths,
+   the watchdog sweep-to-failed, and the preflight skip paths for uninstalled /
+   over-repo-limit — EXCLUDING the already-claimed skip, where the winning
+   claimant does the true-up). Refund = recordTokenUsage(userId, 0, source,
+   ESTIMATED_TOKENS_PER_REVIEW), i.e. the existing adjust_token_usage pattern;
+   no new RPC. Key each refund to WINNING the status transition (guarded update
+   .in('status', ['queued','running']) plus .select() to detect the win) so it
+   fires at most once per analysis even when the Workflow failure path and the
+   watchdog race. The watchdog endpoint needs the userId join
+   (pull_requests -> repositories -> installations.installed_by_user_id).
+   Roughly 100-150 lines including idempotency tests. Context: 13 stranded
+   analyses leaked 26,000 tokens this month (manually refunded 2026-07-17).
+
 ## Backlog — scalability
 
 1. PR-path diff-size cap: the GitHub PR analysis path still has NO input-size
