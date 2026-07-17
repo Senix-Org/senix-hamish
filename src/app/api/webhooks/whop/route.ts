@@ -5,7 +5,13 @@ import { whopsdk } from '@/lib/whop-sdk';
 
 type UnwrapWebhookEvent = WhopNamespace.UnwrapWebhookEvent;
 import { supabaseAdmin } from '@features/shared/supabase';
-import { planForWhopPlanId, planForWhopProductId } from '@features/billing/whop';
+import {
+  CREDIT_PACK_DETAILS,
+  creditPackForWhopIds,
+  planForWhopPlanId,
+  planForWhopProductId,
+} from '@features/billing/whop';
+import type { CreditPackName } from '@features/billing/whop';
 import type { PlanName, PlanStatus } from '@features/billing/plan-limits';
 
 export const runtime = 'nodejs';
@@ -209,6 +215,21 @@ async function handlePaymentSucceeded(
     return;
   }
 
+  // One-time credit pack purchase: grant credits and skip all subscription
+  // logic (a $10 top-up must never flip plan/plan_status). Matched by the
+  // metadata we stamped at checkout, with the plan/product id mapping as a
+  // fallback for purchases made outside our checkout flow.
+  const creditPack = creditPackFromPayment(payment);
+  if (creditPack) {
+    await grantCreditPack({
+      userId: user.id,
+      pack: creditPack,
+      whopEventId: event.id,
+      whopPaymentId: payment.id ?? null,
+    });
+    return;
+  }
+
   // First payment may arrive before/with membership.activated; map the plan
   // when we can so access turns on regardless of event ordering.
   const mappedPlan = planForWhopPlanId(payment.plan?.id) ?? planForWhopProductId(payment.product?.id);
@@ -268,6 +289,70 @@ async function handlePaymentFailed(
     fromPlan: user.plan,
     toPlan: user.plan,
     whopEventId: event.id,
+  });
+}
+
+// --- Credit packs -------------------------------------------------------------
+
+/**
+ * Decide whether a payment is a one-time credit pack purchase. The verified
+ * checkout metadata ({ kind: 'credits', pack }) is authoritative; the Whop
+ * plan/product id mapping is a fallback so purchases made directly through a
+ * Whop-hosted page still grant credits.
+ */
+function creditPackFromPayment(payment: {
+  metadata?: { [key: string]: unknown } | null;
+  plan?: { id?: string } | null;
+  product?: { id?: string } | null;
+}): CreditPackName | null {
+  const meta = payment.metadata;
+  if (meta && meta.kind === 'credits') {
+    const pack = meta.pack;
+    if (pack === 'small' || pack === 'large') return pack;
+    console.warn('[whop webhook] credits metadata with unknown pack', { pack });
+  }
+  return creditPackForWhopIds({
+    planId: payment.plan?.id ?? null,
+    productId: payment.product?.id ?? null,
+  });
+}
+
+/**
+ * Record a purchased credit pack. Inserts one credit_packs row per payment;
+ * the whop_payment_id unique constraint (see the pending migration) makes the
+ * grant idempotent even if the surrounding event-id dedup ever misses.
+ * NOTE: the credit_packs table does not exist yet; migration lands in part 3.
+ */
+async function grantCreditPack(input: {
+  userId: string;
+  pack: CreditPackName;
+  whopEventId: string;
+  whopPaymentId: string | null;
+}): Promise<void> {
+  const details = CREDIT_PACK_DETAILS[input.pack];
+  const { error } = await supabaseAdmin.from('credit_packs').insert({
+    user_id: input.userId,
+    pack: input.pack,
+    credits: details.credits,
+    price_usd: details.price,
+    whop_event_id: input.whopEventId,
+    whop_payment_id: input.whopPaymentId,
+  });
+
+  if (error) {
+    if (/duplicate key|unique/i.test(error.message)) {
+      console.log('[whop webhook] credit pack already granted', {
+        whopPaymentId: input.whopPaymentId,
+      });
+      return;
+    }
+    throw new Error(`Failed to grant credit pack: ${error.message}`);
+  }
+
+  console.log('[whop webhook] credit pack granted', {
+    userId: input.userId,
+    pack: input.pack,
+    credits: details.credits,
   });
 }
 

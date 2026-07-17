@@ -46,6 +46,43 @@ export function whopCheckoutUrlForPlanId(planId: string): string {
   return `https://whop.com/checkout/${encodeURIComponent(planId)}`;
 }
 
+// --- Credit packs (one-time top-up products) ---------------------------------
+
+export type CreditPackName = 'small' | 'large';
+
+/** Token grants per pack (confirmed 2026-07-17): $10 = 200k tokens, $25 = 600k. */
+export const CREDIT_PACK_DETAILS: Record<CreditPackName, { label: string; price: number; credits: number }> = {
+  small: { label: 'Small credit pack', price: 10, credits: 200_000 },
+  large: { label: 'Large credit pack', price: 25, credits: 600_000 },
+};
+
+const CREDIT_PACK_ENV_VARS: Record<CreditPackName, { plan: string; product: string }> = {
+  small: { plan: 'WHOP_CREDITS_SMALL_ID', product: 'WHOP_CREDITS_SMALL_PRODUCT_ID' },
+  large: { plan: 'WHOP_CREDITS_LARGE_ID', product: 'WHOP_CREDITS_LARGE_PRODUCT_ID' },
+};
+
+/** Resolve the configured Whop plan ID for a credit pack, if any. */
+export function creditPackPlanId(pack: CreditPackName): string | null {
+  return process.env[CREDIT_PACK_ENV_VARS[pack].plan]?.trim() || null;
+}
+
+/**
+ * Reverse lookup: which credit pack a Whop plan or product id belongs to.
+ * Used by the payment.succeeded webhook to route one-time credit purchases
+ * away from the subscription logic.
+ */
+export function creditPackForWhopIds(input: {
+  planId?: string | null;
+  productId?: string | null;
+}): CreditPackName | null {
+  for (const pack of Object.keys(CREDIT_PACK_ENV_VARS) as CreditPackName[]) {
+    const vars = CREDIT_PACK_ENV_VARS[pack];
+    if (input.planId && process.env[vars.plan]?.trim() === input.planId) return pack;
+    if (input.productId && process.env[vars.product]?.trim() === input.productId) return pack;
+  }
+  return null;
+}
+
 /**
  * Resolve the Whop plan ID a checkout should use for a paid plan. Prefers the
  * period-specific pre-created plan ID (the secure SDK checkout path needs a
