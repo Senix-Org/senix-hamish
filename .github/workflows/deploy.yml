@@ -22,6 +22,12 @@ env:
   NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key' }}
   NEXT_PUBLIC_GITHUB_APP_SLUG: ${{ secrets.NEXT_PUBLIC_GITHUB_APP_SLUG || 'senix' }}
   NEXT_PUBLIC_WHOP_APP_ID: ${{ secrets.NEXT_PUBLIC_WHOP_APP_ID || 'app_placeholder' }}
+  # PostHog client analytics, from GitHub Actions repository VARIABLES (not
+  # Secrets: the key ships in the browser bundle by design, and a Variable
+  # allows rotation without a code change; not Worker secrets either — those
+  # are runtime-only and NEXT_PUBLIC_* values are inlined at build time here).
+  NEXT_PUBLIC_POSTHOG_KEY: ${{ vars.NEXT_PUBLIC_POSTHOG_KEY }}
+  NEXT_PUBLIC_POSTHOG_HOST: ${{ vars.NEXT_PUBLIC_POSTHOG_HOST }}
   # Build-time placeholders only. `next build` evaluates route modules while
   # collecting page data, and these clients validate their config at module
   # scope. Nothing executes against them during the build (every data route
