@@ -373,6 +373,21 @@ adjust_token_usage (now 22,046). Note for the future: stranded/failed analyses l
 their reservation; the Workflow's failure path does not refund either (only marks
 failed). Consider a refund in mark-analysis-failed or a watchdog-side refund.
 
+## PostHog client-side analytics, Phase 2 (2026-07-17, PR #22)
+
+posthog-js added via src/instrumentation-client.ts (autocapture + pageviews;
+capture_pageview 'history_change' covers App Router client-side navigations).
+Client-side only; no server/webhook/billing code touched. Key finding, third
+instance of the build-vs-runtime trap this week: NEXT_PUBLIC_* values CANNOT be
+Cloudflare Worker secrets — they are inlined during the GitHub Actions build,
+which cannot see runtime Worker secrets. They live as GitHub Actions repository
+VARIABLES (vars.NEXT_PUBLIC_POSTHOG_KEY / _HOST, created by user; Variables not
+Secrets because the key is public-by-design in the bundle, and rotation needs no
+code change). Host confirmed https://us.i.posthog.com. Verification after
+deploy: PostHog Activity view shows $pageview on load, $pageview per client-side
+navigation, $autocapture on clicks. Since Senix's own review will analyze PR #22
+via the new Workflows path, that also re-exercises the pipeline.
+
 ## Backlog — next up (2026-07-18, do first)
 
 1. TOKEN RESERVATION LEAK — own PR, planned 2026-07-17 night, execute fresh:
