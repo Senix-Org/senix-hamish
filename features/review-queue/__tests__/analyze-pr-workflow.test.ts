@@ -22,12 +22,6 @@ const h = vi.hoisted(() => ({
   updates: [] as Array<Record<string, unknown>>,
 }));
 
-vi.mock('cloudflare:workers', () => ({
-  WorkflowEntrypoint: class {
-    env: Record<string, unknown> = {};
-  },
-}));
-
 vi.mock('@features/review-queue/workflow/steps', () => ({
   preflightAnalysis: h.preflight,
   buildDiffSummary: h.buildDiff,
@@ -56,7 +50,7 @@ vi.mock('@features/shared/supabase', () => ({
   },
 }));
 
-import { AnalyzePrWorkflow } from '@features/review-queue/workflow/analyze-pr-workflow';
+import { runAnalyzePipeline } from '@features/review-queue/workflow/analyze-pr-workflow';
 
 const job = {
   analysisId: 'a1',
@@ -82,13 +76,11 @@ function fakeStep() {
   };
 }
 
-function instance() {
-  const wf = new AnalyzePrWorkflow() as unknown as {
-    env: Record<string, unknown>;
-    run(event: { payload: typeof job }, step: unknown): Promise<void>;
-  };
-  wf.env = {};
-  return wf;
+function run(step = fakeStep()) {
+  return runAnalyzePipeline(
+    { payload: job } as unknown as Parameters<typeof runAnalyzePipeline>[0],
+    step as unknown as Parameters<typeof runAnalyzePipeline>[1]
+  );
 }
 
 beforeEach(() => {
@@ -105,7 +97,7 @@ beforeEach(() => {
 
 describe('AnalyzePrWorkflow', () => {
   it('runs the pipeline steps in order', async () => {
-    await instance().run({ payload: job }, fakeStep());
+    await run();
 
     expect(h.calls).toEqual([
       'preflight',
@@ -121,7 +113,7 @@ describe('AnalyzePrWorkflow', () => {
   it('stops after preflight when it declines to proceed', async () => {
     h.preflight.mockResolvedValue({ proceed: false, skippedReason: 'already claimed' });
 
-    await instance().run({ payload: job }, fakeStep());
+    await run();
 
     expect(h.calls).toEqual(['preflight']);
     expect(h.buildDiff).not.toHaveBeenCalled();
@@ -130,7 +122,7 @@ describe('AnalyzePrWorkflow', () => {
   it('skips the comment step when the LLM produced no result', async () => {
     h.runLlm.mockResolvedValue({ llmResult: null, llmError: 'all providers failed' });
 
-    await instance().run({ payload: job }, fakeStep());
+    await run();
 
     expect(h.calls).not.toContain('post-pr-comment');
     expect(h.postComment).not.toHaveBeenCalled();
@@ -141,7 +133,7 @@ describe('AnalyzePrWorkflow', () => {
   it('marks the analysis failed, releases the claim, and rethrows on step failure', async () => {
     h.buildDiff.mockRejectedValue(new Error('github 502'));
 
-    await expect(instance().run({ payload: job }, fakeStep())).rejects.toThrow('github 502');
+    await expect(run()).rejects.toThrow('github 502');
 
     expect(h.calls).toContain('mark-analysis-failed');
     expect(h.updates[0]).toMatchObject({ status: 'failed', error_message: 'github 502' });
