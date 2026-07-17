@@ -1,3 +1,7 @@
+// Guard: importing this module from a client component fails the build with a
+// clear message rather than the cryptic "node:fs" chunking error posthog-node
+// produces when webpack tries to bundle it for the browser.
+import 'server-only';
 import { PostHog } from 'posthog-node';
 
 /**

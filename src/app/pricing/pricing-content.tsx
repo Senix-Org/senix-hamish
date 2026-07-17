@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Check, GitPullRequest, Plug, Sparkles, Zap } from 'lucide-react';
-import { PLAN_LIMITS, type PlanName } from '@features/billing/plan-limits';
+import { PLAN_LIMITS, type PlanName } from '@features/billing/plans';
 import { Reveal, RevealItem, RevealStagger } from '@features/shared/components/reveal';
 import { Faq } from './faq';
 import { PricingCheckoutButton } from './pricing-checkout-button';

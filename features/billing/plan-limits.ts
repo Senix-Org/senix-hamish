@@ -1,18 +1,16 @@
+// Marks this module server-only: importing it from a client component fails
+// the build with a clear message. Necessary because it statically imports
+// posthog-node (node:fs) and Supabase, which cannot bundle for the browser.
+// Client components must import plan data from '@features/billing/plans'.
+import 'server-only';
 import { captureServerEvent } from '@features/shared/posthog-server';
+import { PLAN_LIMITS, PLAN_ORDER } from '@features/billing/plans';
+import type { PlanName, PlanStatus, TokenSource } from '@features/billing/plans';
 
-export const PLAN_LIMITS = {
-  free: { repos: 1, tokens: 50_000, label: 'Free' },
-  starter: { repos: 3, tokens: 400_000, label: 'Starter' },
-  team: { repos: 15, tokens: 1_000_000, label: 'Team' },
-  pro: { repos: -1, tokens: 2_500_000, label: 'Pro' },
-} as const;
-
-export const PLAN_ORDER = ['free', 'starter', 'team', 'pro'] as const;
-
-export type PlanName = keyof typeof PLAN_LIMITS;
-export type PlanStatus = 'active' | 'trialing' | 'cancelled' | 'past_due';
-/** Where a token charge originated. Single shared monthly budget. */
-export type TokenSource = 'pr' | 'mcp' | 'playground';
+// Re-export the pure plan data/types so existing server-side importers of
+// '@features/billing/plan-limits' keep working unchanged.
+export { PLAN_LIMITS, PLAN_ORDER };
+export type { PlanName, PlanStatus, TokenSource };
 
 export type UserPlan = {
   userId: string;
