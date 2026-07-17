@@ -10,6 +10,7 @@ import {
   trueUpTokenUsage,
 } from '@features/review-queue/workflow/steps';
 import type { AnalyzeJob, CommentOutcome } from '@features/review-queue/workflow/steps';
+import { captureServerEvent } from '@features/shared/posthog-server';
 
 /**
  * Cloudflare Workflows execution of the analyze-pr pipeline — the production
@@ -91,6 +92,11 @@ export async function runAnalyzePipeline(
       } catch (releaseErr) {
         console.error(`[analyze-pr] ${job.analysisId}: failed to release claim`, releaseErr);
       }
+    });
+    await captureServerEvent({
+      distinctId: job.userId,
+      event: 'pr_review_failed',
+      properties: { repo: `${job.owner}/${job.repo}`, reason: message },
     });
     throw err;
   }

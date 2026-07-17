@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@features/shared/supabase';
 import { getUserPlan, syncReposConnected } from '@features/billing/plan-limits';
+import { captureServerEvent } from '@features/shared/posthog-server';
 
 type GitHubRepoPayload = {
   id: number;
@@ -144,7 +145,18 @@ type InstallationPayload = {
      if (userId && (reposAdded.length > 0 || reposRemoved.length > 0)) {
        await syncReposConnected(userId);
      }
-   
+
+     // Only a genuine (re)install where the internal user is already linked can
+     // attach to the identified person here; first installs are linked later in
+     // /setup, which fires github_app_installed for that case (see setup/page).
+     if (action === 'created' && userId) {
+       await captureServerEvent({
+         distinctId: userId,
+         event: 'github_app_installed',
+         properties: { account: account.login, account_type: account.type },
+       });
+     }
+
      return `installation:${action}:${installationId}:repos+${reposAdded.length}:repos-${reposRemoved.length}:blocked-${blockedByLimit}`;
    }
 

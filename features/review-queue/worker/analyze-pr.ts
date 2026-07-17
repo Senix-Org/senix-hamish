@@ -10,6 +10,7 @@ import {
   trueUpTokenUsage,
 } from '@features/review-queue/workflow/steps';
 import type { CommentOutcome } from '@features/review-queue/workflow/steps';
+import { captureServerEvent } from '@features/shared/posthog-server';
 
 /**
  * Process an `analyze-pr` job sequentially: fetch the PR diff, build a
@@ -57,6 +58,11 @@ export async function processAnalyzePr(
     } catch (releaseErr) {
       console.error(`[analyze-pr] ${analysisId}: failed to release claim`, releaseErr);
     }
+    await captureServerEvent({
+      distinctId: payload.userId,
+      event: 'pr_review_failed',
+      properties: { repo: `${payload.owner}/${payload.repo}`, reason: err?.message ?? String(err) },
+    });
     throw err;
   } finally {
     // Safety net: if the row somehow slipped through still marked 'running'
