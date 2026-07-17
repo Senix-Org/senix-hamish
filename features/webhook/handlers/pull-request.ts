@@ -184,7 +184,7 @@ export async function handlePullRequest(payload: PullRequestPayload): Promise<st
     baseSha: pr.base.sha,
   };
 
-  const dispatchOutcome = dispatchAnalyzePr(jobPayload);
+  const dispatchOutcome = await dispatchAnalyzePr(jobPayload);
 
   return `pull_request:${action}:${repo.full_name}#${pr.number}:${dispatchOutcome}`;
 }
@@ -226,25 +226,59 @@ async function postLimitReachedComment(input: {
   }
 }
 
-type DispatchOutcome = 'after-dispatched';
+type DispatchOutcome = 'workflow-dispatched' | 'after-dispatched';
+
+/** Minimal shape of a Workflow binding; avoids depending on runtime types. */
+type WorkflowBinding = {
+  create(options?: { id?: string; params?: unknown }): Promise<unknown>;
+};
 
 /**
- * Schedule the analysis to run after the webhook responds 200 to GitHub.
- *
- * Next.js `after()` runs the callback once the response has been sent, so
- * GitHub gets its fast acknowledgement while the analysis runs in the
- * background under this route's maxDuration. We call `processAnalyzePr`
- * directly instead of POSTing to the internal analyze-pr route: removing
- * the internal HTTP hop removes a failure point and lets the webhook
- * route's maxDuration govern the analysis time.
- *
- * `processAnalyzePr` records its own success/failure on the analysis row
- * (including a finally-block safety net), so a thrown error here is already
- * reflected in the DB. As a last-resort recovery for infrastructure faults
- * (e.g. the row was never claimed), we enqueue to Redis so the standalone
- * polling worker can still pick the job up.
+ * Resolve the ANALYZE_PR_WORKFLOW binding when running on Cloudflare.
+ * Returns null anywhere the binding does not exist (node dev server, tests,
+ * the standalone worker), which selects the legacy after() path below.
  */
-function dispatchAnalyzePr(payload: JobPayloadMap['analyze-pr']): DispatchOutcome {
+async function getAnalyzeWorkflowBinding(): Promise<WorkflowBinding | null> {
+  try {
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+    const { env } = getCloudflareContext();
+    const binding = (env as Record<string, unknown>).ANALYZE_PR_WORKFLOW;
+    return binding ? (binding as WorkflowBinding) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Dispatch the analysis job.
+ *
+ * Preferred path: create a Cloudflare Workflow instance (AnalyzePrWorkflow)
+ * and return 200 to GitHub immediately. Workflows persist and retry each
+ * pipeline step independently and have no 30-second wall-clock cap — the
+ * after()/waitUntil path was silently cancelled ~30s after the response
+ * (see the 2026-07-17 incident in CLAUDE.md).
+ *
+ * Legacy path (no binding, e.g. local dev/tests, or create() failed): run
+ * processAnalyzePr in a Next.js after() callback exactly as before, with the
+ * Redis queue as the last-resort fallback so the standalone polling worker
+ * can pick the job up.
+ */
+async function dispatchAnalyzePr(payload: JobPayloadMap['analyze-pr']): Promise<DispatchOutcome> {
+  const workflow = await getAnalyzeWorkflowBinding();
+  if (workflow) {
+    try {
+      // The analysis id is unique per analysis row, and Workflows reject a
+      // duplicate instance id — a bonus dedup layer on top of claimAnalysis.
+      await workflow.create({ id: payload.analysisId, params: payload });
+      return 'workflow-dispatched';
+    } catch (err: unknown) {
+      console.error('[pull-request] workflow dispatch failed, falling back to after()', {
+        analysisId: payload.analysisId,
+        message: errorMessage(err),
+      });
+    }
+  }
+
   after(async () => {
     try {
       await processAnalyzePr(payload);

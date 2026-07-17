@@ -280,6 +280,57 @@ own API credit expiry policy; migration 016's comment updated to say so. Phase 2
 Phase 2 backend committed on branch feature/credit-packs, PR opened for Senix
 dogfood review before merge (see PR for verdict).
 
+DIRECTION REVISED (2026-07-17): Cloudflare Workflows, not Queues, per Cloudflare's
+own guidance (Queues for single-step jobs, Workflows for multi-step processes with
+per-step retry; per-step wall clock is unlimited for network waits). Workflows is
+also confirmed accessible on this account (wrangler workflows list works).
+
+## Fix — analyze-pr moved to Cloudflare Workflows (2026-07-17)
+
+Implemented on branch fix/analyze-pr-workflows. Design as agreed:
+
+1. features/review-queue/workflow/steps.ts: the pipeline decomposed into shared,
+   individually retryable step functions (preflightAnalysis, buildDiffSummary,
+   runLlmAnalysis, postAnalysisComment, finalizeAnalysis, trueUpTokenUsage). Step
+   inputs/outputs are JSON-serializable and compact (raw file contents never cross
+   a step boundary; only the structural diff summary does). postAnalysisComment
+   now persists the comment id inside the step right after creation, closing the
+   retry window that could have double-commented.
+2. features/review-queue/workflow/analyze-pr-workflow.ts: AnalyzePrWorkflow
+   (WorkflowEntrypoint) runs each stage in step.do() with retry configs (LLM step
+   retries capped low because analyzePR already runs the provider failover ladder
+   internally). On step-retry exhaustion it marks the analysis failed (guarded,
+   non-terminal states only), releases the Redis claim, and rethrows. It hydrates
+   process.env from this.env because OpenNext does not populate process.env for
+   Workflow invocations.
+3. worker.ts (repo root): custom Worker entry re-exporting the OpenNext-generated
+   handler plus AnalyzePrWorkflow; wrangler.jsonc main now points here and adds
+   the workflows binding (name senix-analyze-pr, binding ANALYZE_PR_WORKFLOW).
+4. Dispatch (features/webhook/handlers/pull-request.ts): tries the Workflow
+   binding first (instance id = analysisId, a bonus dedup layer); anywhere the
+   binding is absent (node dev, tests, standalone worker) or create() fails, it
+   falls back to the legacy after() path, then Redis, exactly as before.
+   processAnalyzePr remains as the sequential runner for those paths.
+5. types/cloudflare-workers.d.ts: minimal local shim for the cloudflare:workers
+   virtual module (the repo does not use @cloudflare/workers-types).
+6. Tests: analyze-pr-workflow.test.ts (step order, preflight short-circuit,
+   comment skip on LLM failure, failure marking + claim release + rethrow). tsc
+   clean; all 145 tests pass, including unchanged integration suites which
+   exercise the preserved after() fallback.
+
+CAVEAT: the OpenNext build cannot be verified on this Windows box (known); the
+custom worker.ts entry + workflows binding get their first real verification in
+the GitHub Actions deploy. If the deploy fails, look there first.
+
+## Backlog — scalability
+
+1. PR-path diff-size cap: the GitHub PR analysis path still has NO input-size
+   cap (playground caps 50KB, MCP caps input; PR path only skips the structural
+   diff above 50 files). Workflows removed the time pressure, but an enormous
+   diff still means unbounded GitHub fetches and LLM prompt cost. Decide and
+   implement a cap as a cost-control measure. Explicitly logged as backlog
+   (2026-07-17), not dropped.
+
 # Project conventions for Claude Code
 
 Writing style:
