@@ -405,6 +405,24 @@ via the new Workflows path, that also re-exercises the pipeline.
    Roughly 100-150 lines including idempotency tests. Context: 13 stranded
    analyses leaked 26,000 tokens this month (manually refunded 2026-07-17).
 
+2. DASHBOARD DISPLAY BUGS (reported 2026-07-17, NOT yet investigated, record
+   only). Two separate reviews-list symptoms to look into fresh:
+   a. DUPLICATE ROWS: PR #22 shows twice in the reviews list with two
+      different analysis ids and two different risk badges. Hypothesis:
+      duplicate webhook delivery created two analyses rows instead of
+      deduping. Check the GitHub delivery idempotency (claimDelivery /
+      github_delivery_id unique) and whether reopen/synchronize legitimately
+      creates a second analysis vs an accidental duplicate; confirm against
+      the analyses rows for PR #22's pull_request_id.
+   b. "UNKNOWN" RISK BADGE: PR #23 and #24 show "Unknown" instead of a risk
+      badge in the reviews list even though the analysis completed. Hypothesis:
+      the pipeline completed without producing/attaching a risk_level (LLM
+      returned no riskLevel, or finalizeAnalysis wrote null). Check those
+      analyses rows' risk_level and whether the LLM step failed silently while
+      the structural diff still marked the row completed (llmError path).
+   Both are display/data-integrity issues, not blockers; investigate with a
+   clear head, do not fix tonight.
+
 ## Backlog — scalability
 
 1. PR-path diff-size cap: the GitHub PR analysis path still has NO input-size
