@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { supabaseAdmin } from '@features/shared/supabase';
 import { verifyInternalAuth, internalUnauthorized } from '@/lib/internal-auth';
+import { captureServerEvent } from '@features/shared/posthog-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,6 +39,14 @@ type StrandedRow = {
   commit_sha: string | null;
   created_at: string;
   pull_request_id: string | null;
+  // Nested join to recover the internal user id for the PostHog event:
+  // analyses -> pull_requests -> repositories -> installations.
+  pull_requests: {
+    repositories: {
+      full_name: string | null;
+      installations: { installed_by_user_id: string | null } | null;
+    } | null;
+  } | null;
 };
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -49,7 +58,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const { data, error } = (await supabaseAdmin
     .from('analyses')
-    .select('id, status, commit_sha, created_at, pull_request_id')
+    .select(
+      'id, status, commit_sha, created_at, pull_request_id, ' +
+        'pull_requests(repositories(full_name, installations(installed_by_user_id)))'
+    )
     .in('status', ['queued', 'running'])
     .lt('created_at', cutoff)
     .order('created_at', { ascending: true })
@@ -97,6 +109,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       });
     } else {
       marked += 1;
+      const repo = row.pull_requests?.repositories ?? null;
+      await captureServerEvent({
+        distinctId: repo?.installations?.installed_by_user_id,
+        event: 'pr_review_failed',
+        properties: {
+          repo: repo?.full_name ?? undefined,
+          reason: 'stranded: never completed (watchdog swept to failed)',
+        },
+      });
     }
   }
 

@@ -10,6 +10,7 @@ import type { JobPayloadMap } from '@features/review-queue/queue';
 import { claimAnalysis } from '@features/review-queue/queue';
 import { getAppBaseUrl } from '@features/shared/mcp-config';
 import { isOverRepoLimit, recordTokenUsage, ESTIMATED_TOKENS_PER_REVIEW } from '@features/billing/plan-limits';
+import { captureServerEvent } from '@features/shared/posthog-server';
 
 /**
  * The analyze-pr pipeline, decomposed into discrete, independently retryable
@@ -301,11 +302,12 @@ export async function finalizeAnalysis(
   const errorMessage =
     [llm.llmError, comment.postError].filter((p): p is string => Boolean(p)).join(' | ') || null;
 
-  await supabaseAdmin
+  const completedAt = new Date();
+  const { data: updated } = (await supabaseAdmin
     .from('analyses')
     .update({
       status: 'completed',
-      completed_at: new Date().toISOString(),
+      completed_at: completedAt.toISOString(),
       summary: llm.llmResult?.summary ?? null,
       risk_level: llm.llmResult?.riskLevel ?? null,
       focus_areas: llm.llmResult?.focusAreas ?? [],
@@ -325,7 +327,25 @@ export async function finalizeAnalysis(
       github_comment_id: comment.commentId,
       github_comment_url: comment.commentUrl,
     })
-    .eq('id', job.analysisId);
+    .eq('id', job.analysisId)
+    .select('created_at')
+    .maybeSingle()) as unknown as { data: { created_at: string | null } | null };
+
+  const createdAt = updated?.created_at ? new Date(updated.created_at) : null;
+  const durationSeconds = createdAt
+    ? Math.max(0, Math.round((completedAt.getTime() - createdAt.getTime()) / 1000))
+    : undefined;
+
+  await captureServerEvent({
+    distinctId: job.userId,
+    event: 'pr_review_completed',
+    properties: {
+      repo: `${job.owner}/${job.repo}`,
+      risk_level: llm.llmResult?.riskLevel ?? undefined,
+      tokens_used: llm.llmResult?.tokensUsed ?? undefined,
+      duration_seconds: durationSeconds,
+    },
+  });
 }
 
 /**

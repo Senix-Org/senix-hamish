@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Check } from 'lucide-react';
 import { useEffect, useRef } from 'react';
-import { PLAN_LIMITS } from '@features/billing/plan-limits';
+import { PLAN_LIMITS } from '@features/billing/plans';
 import { TraeButton } from '../ui/trae-button';
 import { useReducedMotion } from '../../hooks/use-reduced-motion';
 import { useTraeReveal } from '../../hooks/use-trae-reveal';

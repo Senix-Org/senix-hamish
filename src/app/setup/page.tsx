@@ -6,6 +6,7 @@ import { supabaseAdmin } from '@features/shared/supabase';
 import { getUserPlan, syncReposConnected } from '@features/billing/plan-limits';
 import { SiteNav } from '@features/shared/components/site-nav';
 import { getAppBaseUrl } from '@features/shared/mcp-config';
+import { captureServerEvent } from '@features/shared/posthog-server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -203,6 +204,16 @@ async function linkInstallationToUser(
       .update({ installed_by_user_id: userId })
       .eq('id', installation.id);
     installation.installed_by_user_id = userId;
+
+    // First-time link of this install to a known internal user: the real
+    // "user installed the app" moment where we finally have the distinct id
+    // (the raw installation webhook fires before this link exists). Guarded to
+    // the null->userId transition, so it fires once per install, not per visit.
+    await captureServerEvent({
+      distinctId: userId,
+      event: 'github_app_installed',
+      properties: { account: installation.account_login },
+    });
   }
 
   return installation;

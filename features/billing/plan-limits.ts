@@ -1,16 +1,16 @@
-export const PLAN_LIMITS = {
-  free: { repos: 1, tokens: 50_000, label: 'Free' },
-  starter: { repos: 3, tokens: 400_000, label: 'Starter' },
-  team: { repos: 15, tokens: 1_000_000, label: 'Team' },
-  pro: { repos: -1, tokens: 2_500_000, label: 'Pro' },
-} as const;
+// Marks this module server-only: importing it from a client component fails
+// the build with a clear message. Necessary because it statically imports
+// posthog-node (node:fs) and Supabase, which cannot bundle for the browser.
+// Client components must import plan data from '@features/billing/plans'.
+import 'server-only';
+import { captureServerEvent } from '@features/shared/posthog-server';
+import { PLAN_LIMITS, PLAN_ORDER } from '@features/billing/plans';
+import type { PlanName, PlanStatus, TokenSource } from '@features/billing/plans';
 
-export const PLAN_ORDER = ['free', 'starter', 'team', 'pro'] as const;
-
-export type PlanName = keyof typeof PLAN_LIMITS;
-export type PlanStatus = 'active' | 'trialing' | 'cancelled' | 'past_due';
-/** Where a token charge originated. Single shared monthly budget. */
-export type TokenSource = 'pr' | 'mcp' | 'playground';
+// Re-export the pure plan data/types so existing server-side importers of
+// '@features/billing/plan-limits' keep working unchanged.
+export { PLAN_LIMITS, PLAN_ORDER };
+export type { PlanName, PlanStatus, TokenSource };
 
 export type UserPlan = {
   userId: string;
@@ -196,8 +196,8 @@ export async function getUserPlan(userId: string): Promise<UserPlan> {
 export async function checkTokenLimit(
   userId: string,
   estimatedTokens: number,
-  // `source` is accepted for call-site clarity and future per-source metering.
-  _source: TokenSource
+  // The review source (pr/mcp/playground); attached to the token_limit_hit event.
+  source: TokenSource
 ): Promise<TokenLimitResult> {
   const userPlan = await getUserPlan(userId);
   const limit = userPlan.effectiveLimit.tokens;
@@ -209,7 +209,13 @@ export async function checkTokenLimit(
     tokens_to_consume: estimate,
     monthly_limit: limit,
   })) as unknown as {
-    data: { allowed: boolean; from_monthly?: number; from_packs?: number } | null;
+    data: {
+      allowed: boolean;
+      from_monthly?: number;
+      from_packs?: number;
+      monthly_remaining?: number;
+      pack_remaining?: number;
+    } | null;
     error: { message: string } | null;
   };
 
@@ -218,6 +224,20 @@ export async function checkTokenLimit(
   }
 
   if (!data?.allowed) {
+    // Fire-and-forget (hot path): never awaited, never blocks the gate.
+    void captureServerEvent({
+      distinctId: userId,
+      event: 'token_limit_hit',
+      properties: {
+        source,
+        plan: userPlan.effectivePlan,
+        // "monthly vs credits exhausted": had_credits true means the user also
+        // had a credit balance that was drained, not just the monthly budget.
+        had_credits: (data?.pack_remaining ?? 0) > 0,
+        monthly_remaining: data?.monthly_remaining,
+        pack_remaining: data?.pack_remaining,
+      },
+    });
     return {
       allowed: false,
       reason: `Monthly token budget and credit balance exhausted for the ${userPlan.effectiveLimit.label} plan.`,

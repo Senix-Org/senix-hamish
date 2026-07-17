@@ -13,6 +13,7 @@ import {
 } from '@features/billing/whop';
 import type { CreditPackName } from '@features/billing/whop';
 import type { PlanName, PlanStatus } from '@features/billing/plan-limits';
+import { captureServerEvent } from '@features/shared/posthog-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -159,6 +160,12 @@ async function handleMembershipActivated(
     toPlan: plan,
     whopEventId: event.id,
   });
+
+  await captureServerEvent({
+    distinctId: user.id,
+    event: 'subscription_started',
+    properties: { plan, trial: isTrial },
+  });
 }
 
 async function handleMembershipDeactivated(
@@ -197,6 +204,12 @@ async function handleMembershipDeactivated(
     fromPlan: user.plan,
     toPlan: 'free',
     whopEventId: event.id,
+  });
+
+  await captureServerEvent({
+    distinctId: user.id,
+    event: 'subscription_cancelled',
+    properties: { plan: user.plan },
   });
 }
 
@@ -353,6 +366,16 @@ async function grantCreditPack(input: {
     userId: input.userId,
     pack: input.pack,
     credits: details.credits,
+  });
+
+  await captureServerEvent({
+    distinctId: input.userId,
+    event: 'credit_pack_purchased',
+    properties: {
+      pack: input.pack,
+      price_cents: Math.round(details.price * 100),
+      credits: details.credits,
+    },
   });
 }
 
