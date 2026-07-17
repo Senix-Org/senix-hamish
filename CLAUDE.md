@@ -277,8 +277,38 @@ Pack expiry RESOLVED (2026-07-17): 12 months is intentional, mirroring Anthropic
 own API credit expiry policy; migration 016's comment updated to say so. Phase 2b
 (buy buttons + balance display UI) split into its own follow-up per decision.
 
-Phase 2 backend committed on branch feature/credit-packs, PR opened for Senix
-dogfood review before merge (see PR for verdict).
+Phase 2 backend committed on branch feature/credit-packs, PR #17. Senix's dogfood
+review never completed (see incident below); the PR was manually reviewed in full by
+the user across the session and MERGED to main on that basis (2026-07-17).
+
+## Incident — analyses stranded by the Workers waitUntil 30s limit (2026-07-17)
+
+Found while waiting for Senix to review PR #17. ROOT CAUSE CONFIRMED: PR analyses
+run in after(), which OpenNext backs with ctx.waitUntil(); Cloudflare cancels
+waitUntil work ~30 seconds after the response is sent (documented, all plans:
+developers.cloudflare.com/workers/platform/limits). The cancellation does not
+throw, so no catch runs, the Redis fallback in dispatchAnalyzePr never fires, and
+the analyses row sits in status running forever with no error. The code comments
+claiming "no wall-clock cap on Workers, billing is CPU time" confused CPU limits
+with the waitUntil lifetime; they are wrong.
+
+Evidence: the only two analyses that ever completed on Cloudflare took 7.3s and
+23.0s; 5 of the 6 most recent (PR #17, two attempts on PR #16, three on 07-07)
+are stranded in running. Cloudflare Observability shows "waitUntil() tasks did
+not complete within the allowed time ... cancelled" after POST
+/api/webhooks/github. The GitHub PR path also has NO diff-size cap (playground
+caps 50KB, MCP caps input; PR path only skips structural diff above 50 files),
+and the LLM failover ladder allows worst cases of minutes against the 30s budget.
+
+Mitigation shipped: PR #18 (fix/stranded-analysis-watchdog) adds internal
+endpoint check-stranded-analyses (marks rows non-terminal for >2 min as failed
+with an explanatory message, logs at error level) plus a step in the daily
+maintenance workflow that fails loudly when any are found.
+
+REAL FIX PENDING: move analysis execution off waitUntil onto Cloudflare Queues.
+CONFIRMED AVAILABLE on this account's current Workers Free plan (wrangler queues
+list works; free tier includes 10,000 ops/day, ~3 ops per message; consumers get
+15 min wall time). No plan upgrade needed.
 
 # Project conventions for Claude Code
 
