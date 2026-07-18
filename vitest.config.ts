@@ -15,10 +15,6 @@ export default defineConfig({
     alias: [
       { find: /^@features\//, replacement: path.resolve(__dirname, 'features') + '/' },
       { find: /^@\//, replacement: path.resolve(__dirname, 'src') + '/' },
-      // `server-only` throws on import in a plain Node context; Next swaps it
-      // for an empty module in server builds via the `react-server` condition.
-      // Vitest (Node) does the same here so server-only modules are testable.
-      { find: /^server-only$/, replacement: path.resolve(__dirname, 'node_modules/server-only/empty.js') },
     ],
   },
   test: {

@@ -1,11 +1,11 @@
 /**
- * Pure plan data and types, with NO server-only dependencies, so this module
- * is safe to import from client components (the pricing/marketing UI) as well
- * as server code. Server logic (getUserPlan, checkTokenLimit, etc.) lives in
- * plan-limits.ts, which is marked `server-only` because it pulls in Supabase
- * and posthog-node (node:fs) that cannot bundle for the browser. plan-limits.ts
- * re-exports everything here for back-compat, so existing server imports are
- * unchanged; client components must import from THIS file.
+ * Pure plan data and types, with NO server dependencies, so this module is
+ * safe to import from client components (the pricing/marketing UI) as well as
+ * server code. Server logic (getUserPlan, checkTokenLimit, etc.) lives in
+ * plan-limits.ts, which pulls in Supabase and other server-only code that
+ * cannot bundle for the browser. plan-limits.ts re-exports everything here
+ * for back-compat, so existing server imports are unchanged; client
+ * components must import plan data from THIS file, never plan-limits.ts.
  */
 
 export const PLAN_LIMITS = {

@@ -388,6 +388,37 @@ deploy: PostHog Activity view shows $pageview on load, $pageview per client-side
 navigation, $autocapture on clicks. Since Senix's own review will analyze PR #22
 via the new Workflows path, that also re-exercises the pipeline.
 
+## Incident — Phase 4 server-only crash broke all PR analyses (2026-07-18)
+
+Phase 4 (PR #24, server-side PostHog events) deployed 2026-07-17 20:51 UTC and
+broke every PR analysis: Workflow instances Errored in 0 seconds with
+"This module cannot be imported from a Client Component module." ROOT CAUSE:
+the `import 'server-only'` guard added to posthog-server.ts and plan-limits.ts
+during the client-bundle fix. server-only only resolves to its harmless empty
+module when the bundler sets the `react-server` export condition; OpenNext's
+Next build sets it (so next build passed and API routes kept working) but the
+WRANGLER bundle of the custom worker.ts Workflow entry does NOT, so the
+throwing variant loaded at the workflow's dynamic import, before any step ran
+(rows stuck in queued, no error recorded; the fallback never fires because the
+throw is outside runAnalyzePipeline's try/catch).
+
+Response: rolled back live Worker to pre-Phase-4 version 3f3c645b via
+"wrangler rollback" (2026-07-18 13:23 UTC); verified with a real review
+completing end to end. CASUALTIES: exactly one analysis in the outage window,
+the test PR #25 on the senix-dev dogfood account; zero real users affected;
+watchdog swept it to failed correctly; no refunds owed (test account).
+
+Fix-forward: PR #26 (fix/posthog-server-fetch) rewrites captureServerEvent as
+a direct fetch POST to PostHog /capture/ (3s timeout, never throws), removes
+posthog-node and server-only entirely, keeps the plans.ts client/server data
+split. LESSONS: (1) wrangler and OpenNext bundle with different export
+conditions — anything imported by worker.ts must behave identically under
+both; server-only is therefore BANNED from any module reachable from
+worker.ts. (2) next build passing does not validate the wrangler bundle.
+(3) The two deploys during the outage (42cc0dba, c5b71ac9) shipped from main
+while main was broken; a Worker rollback does not fix main — treat main as
+undeployable until the fix-forward merges.
+
 ## Backlog — next up (2026-07-18, do first)
 
 1. TOKEN RESERVATION LEAK — own PR, planned 2026-07-17 night, execute fresh:
