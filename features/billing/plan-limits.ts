@@ -1,8 +1,3 @@
-// Marks this module server-only: importing it from a client component fails
-// the build with a clear message. Necessary because it statically imports
-// posthog-node (node:fs) and Supabase, which cannot bundle for the browser.
-// Client components must import plan data from '@features/billing/plans'.
-import 'server-only';
 import { captureServerEvent } from '@features/shared/posthog-server';
 import { PLAN_LIMITS, PLAN_ORDER } from '@features/billing/plans';
 import type { PlanName, PlanStatus, TokenSource } from '@features/billing/plans';
