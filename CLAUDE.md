@@ -419,6 +419,21 @@ worker.ts. (2) next build passing does not validate the wrangler bundle.
 while main was broken; a Worker rollback does not fix main — treat main as
 undeployable until the fix-forward merges.
 
+## Fix — CI test runs leaked real PostHog events as "user-1" (2026-07-18)
+
+A PostHog person literally named "user-1" (geolocations = GitHub runner cities,
+Chicago/Des Moines) was created by the vitest suite running in GitHub Actions:
+deploy.yml's workflow-level env gives the Run tests step the REAL
+NEXT_PUBLIC_POSTHOG_KEY (needed for the build step), and tests that exercise
+event-emitting paths (plan-limits denial -> token_limit_hit, whop-webhook ->
+subscription events, workflow failure -> pr_review_failed) do not mock
+posthog-server, so captureServerEvent POSTed real events under mock ids
+('user-1', 'u1'). No production call site uses a placeholder; all nine pass
+resolved internal UUIDs, and the helper skips on null. Fix (two layers):
+captureServerEvent no-ops when NODE_ENV === 'test', and vitest.config blanks
+NEXT_PUBLIC_POSTHOG_KEY in the test env. Cleanup: delete the "user-1" and any
+'u1'/'me' persons in the PostHog dashboard (needs UI access).
+
 ## Backlog — next up (2026-07-18, do first)
 
 1. TOKEN RESERVATION LEAK — own PR, planned 2026-07-17 night, execute fresh:
