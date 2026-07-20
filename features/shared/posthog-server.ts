@@ -26,6 +26,12 @@ export async function captureServerEvent(input: {
   properties?: Record<string, unknown>;
 }): Promise<void> {
   try {
+    // Never emit from a test run. CI's workflow-level env carries the real
+    // PostHog key for the build step, so without this guard vitest suites
+    // that exercise event-emitting code paths capture REAL events under mock
+    // ids (the "user-1" person with GitHub-runner geolocations, 2026-07-18).
+    if (process.env.NODE_ENV === 'test') return;
+
     const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
     // No key (unset) or no identified user → skip. Every server event must
     // attach to the internal user UUID from Phase 3, never an anonymous id.
