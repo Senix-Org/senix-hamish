@@ -93,3 +93,31 @@
    - All tables have RLS enabled.
    - Users can only see their own installations, repos, PRs, and analyses (joined via `installations.installed_by_user_id`).
    - Service role (used by the worker) bypasses RLS.
+   ### affiliates (migration 017)
+   YouTuber referral partners; codes power senix.dev/yt/{code} links.
+   - `id` (uuid, primary key)
+   - `code` (text, unique) — lowercase [a-z0-9-], 2-40 chars
+   - `name` (text)
+   - `payout_contact` (text, nullable)
+   - `created_at` (timestamptz, default `now()`)
+   - RLS enabled, no policies (service-role only).
+
+   ### users.referred_by_affiliate_id (migration 017)
+   First-touch attribution, set once at signup from the senix_ref cookie.
+   References `affiliates(id)`, nullable, partial index where not null.
+
+   ### affiliate_commissions (migration 017)
+   10% of a referred user's FIRST subscription payment. Written only by the
+   Whop payment.succeeded webhook; idempotent structurally:
+   - `whop_payment_id` (text, UNIQUE) — retry-safe
+   - `user_id` (uuid, UNIQUE) — one commission per referred user, ever
+   - `affiliate_id`, `payment_amount_cents`, `commission_cents` (10%),
+     `currency`, `status` ('unpaid'|'paid'), `created_at`, `paid_at`
+   - RLS enabled, no policies (service-role only).
+
+   ### admin_dashboard_metrics() (migration 017)
+   Single-round-trip jsonb aggregate powering /internal/metrics: signups,
+   plan counts, MRR (active paid users x list price in SQL; keep in sync
+   with PAID_PLAN_DETAILS), review totals/failures, an explicit "errored"
+   bucket (completed with NULL risk_level), credit pack revenue, and
+   commission totals.
