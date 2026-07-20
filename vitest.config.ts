@@ -20,6 +20,13 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    env: {
+      // Defense-in-depth alongside captureServerEvent's NODE_ENV guard:
+      // blank the PostHog key so tests can never emit real analytics even in
+      // CI, where the workflow-level env carries the production key for the
+      // build step (root cause of the "user-1" person in PostHog).
+      NEXT_PUBLIC_POSTHOG_KEY: '',
+    },
     include: [
       'features/**/__tests__/**/*.test.ts',
       'tests/**/*.test.ts',
