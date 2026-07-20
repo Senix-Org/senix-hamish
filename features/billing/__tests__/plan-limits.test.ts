@@ -201,7 +201,7 @@ describe('getUserPlan (token usage the dashboard/billing render)', () => {
     expect(plan.tokenLimit).toBe(PLAN_LIMITS.free.tokens);
     // The dashboard renders "X / Y tokens used" + a percent of the budget.
     const percent = Math.min(100, Math.round((plan.tokensUsed / plan.tokenLimit) * 100));
-    expect(percent).toBe(25);
+    expect(percent).toBe(Math.round((12_451 / PLAN_LIMITS.free.tokens) * 100));
   });
 });
 

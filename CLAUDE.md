@@ -434,6 +434,46 @@ captureServerEvent no-ops when NODE_ENV === 'test', and vitest.config blanks
 NEXT_PUBLIC_POSTHOG_KEY in the test env. Cleanup: delete the "user-1" and any
 'u1'/'me' persons in the PostHog dashboard (needs UI access).
 
+## Pricing update + affiliate tracking + admin metrics (2026-07-20)
+
+Built on branch feature/pricing-affiliates-admin, one combined PR. Three parts:
+
+1. TOKEN BUDGETS (plans.ts only, no migration; verified no other file hardcodes
+   the numbers): free 50k -> 20k, starter 400k -> 500k, team 1M -> 2.5M,
+   pro 2.5M -> 5M. Pricing/docs/marketing pages all render from PLAN_LIMITS so
+   they update automatically. plan-values.test.ts pins the exact numbers.
+
+2. AFFILIATES: migration 017 (affiliates, users.referred_by_affiliate_id,
+   affiliate_commissions with UNIQUE whop_payment_id AND UNIQUE user_id so
+   "10% of FIRST payment only" is a DB constraint, not just code; RLS
+   service-role-only, same pattern as credit_packs). /yt/{code} route sets a
+   30-day senix_ref cookie (sameSite=lax survives the GitHub OAuth round trip)
+   and redirects to the landing page; /auth/callback stamps first-touch
+   attribution set-once after the users upsert (best-effort, never affects
+   login). payment.succeeded routes referred users through
+   maybeGrantAffiliateCommission (features/billing/affiliates.ts):
+   billing_reason 'subscription_create' primary signal, null falls back to
+   pre-event whop_membership_id === null, renewals ('subscription_cycle')
+   never insert. Credit packs never reach the commission path. Amount =
+   payment.subtotal (fallback settlement_amount) x 10%, in cents.
+   /internal/affiliates: create affiliates, ledger view, paid/unpaid toggle
+   (server actions, behind the existing /internal Basic Auth).
+
+3. ADMIN METRICS: /internal/metrics renders admin_dashboard_metrics() (RPC in
+   migration 017, one SQL round trip, no N+1): signups today/7d, free vs
+   paying by plan, MRR (chose DB source: active paid users x list price,
+   because the DB gates access and cron-reconcile keeps it Whop-aligned; SQL
+   prices must stay in sync with PAID_PLAN_DETAILS), reviews total/today,
+   failure rates all-time/24h, an explicit "errored" bucket for
+   completed-with-NULL-risk_level rows, credit pack revenue, commissions owed.
+
+Tests: 14 new (plan values; commission unit rules incl. explicit
+renewal-creates-no-row; webhook-level first-payment/renewal/unreferred).
+159 total pass; tsc clean; next build clean. NOTE: migration 017 NOT yet
+applied to prod; nothing user-visible works until it is. server-only NOT used
+anywhere new (banned from worker-reachable code per 2026-07-18 incident;
+affiliates.ts is reachable from the whop route only, not worker.ts).
+
 ## Backlog — next up (2026-07-18, do first)
 
 1. TOKEN RESERVATION LEAK — own PR, planned 2026-07-17 night, execute fresh:

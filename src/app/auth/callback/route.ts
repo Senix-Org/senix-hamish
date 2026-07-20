@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@features/shared/supabase-server';
 import { supabaseAdmin } from '@features/shared/supabase';
+import { AFFILIATE_COOKIE, attributeSignupToAffiliate } from '@features/billing/affiliates';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,6 +58,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         },
         { onConflict: 'auth_user_id' }
       );
+
+      // Affiliate attribution: if the visitor arrived via senix.dev/yt/{code}
+      // the cookie survives the OAuth round trip; stamp first-touch
+      // attribution (set-once, inside the helper) now that the row exists.
+      // Best-effort: attribution must never affect login.
+      const refCode = req.cookies.get(AFFILIATE_COOKIE)?.value;
+      if (refCode) {
+        await attributeSignupToAffiliate(authData.user.id, refCode);
+      }
     }
   } catch {
     // Non-fatal — the user can still reach the dashboard; the row

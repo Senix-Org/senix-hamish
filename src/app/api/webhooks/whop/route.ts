@@ -14,6 +14,7 @@ import {
 import type { CreditPackName } from '@features/billing/whop';
 import type { PlanName, PlanStatus } from '@features/billing/plan-limits';
 import { captureServerEvent } from '@features/shared/posthog-server';
+import { maybeGrantAffiliateCommission } from '@features/billing/affiliates';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,7 @@ type AppUserRow = {
   plan: PlanName;
   plan_status: PlanStatus;
   whop_membership_id: string | null;
+  referred_by_affiliate_id: string | null;
 };
 
 /**
@@ -261,6 +263,20 @@ async function handlePaymentSucceeded(
     throw new Error(`Failed to apply payment.succeeded: ${error.message}`);
   }
 
+  // Affiliate commission: 10% of the FIRST subscription payment for referred
+  // users, never on renewals. `user` here is the row as read BEFORE this
+  // event's updates, so its whop_membership_id is the pre-payment state the
+  // null-billing_reason fallback needs. Never throws; DB UNIQUE constraints
+  // (user_id, whop_payment_id) make it idempotent. Credit packs return above
+  // and never reach this.
+  await maybeGrantAffiliateCommission(user, {
+    id: payment.id,
+    billing_reason: (payment as { billing_reason?: string | null }).billing_reason ?? null,
+    subtotal: (payment as { subtotal?: number | null }).subtotal ?? null,
+    settlement_amount: (payment as { settlement_amount?: number | null }).settlement_amount ?? null,
+    currency: (payment as { currency?: string | null }).currency ?? null,
+  });
+
   if (wasPastDue) {
     await insertPlanEvent({
       userId: user.id,
@@ -412,7 +428,7 @@ async function resolveUser(input: {
 async function findUser(column: 'id' | 'whop_membership_id' | 'email', value: string) {
   const { data } = (await supabaseAdmin
     .from('users')
-    .select('id, email, plan, plan_status, whop_membership_id')
+    .select('id, email, plan, plan_status, whop_membership_id, referred_by_affiliate_id')
     .eq(column, value)
     .maybeSingle()) as unknown as { data: AppUserRow | null };
   return data;

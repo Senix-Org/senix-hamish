@@ -8,11 +8,13 @@
  * components must import plan data from THIS file, never plan-limits.ts.
  */
 
+// Monthly token budgets updated 2026-07-20 (pricing decision):
+// free 50k -> 20k, starter 400k -> 500k, team 1M -> 2.5M, pro 2.5M -> 5M.
 export const PLAN_LIMITS = {
-  free: { repos: 1, tokens: 50_000, label: 'Free' },
-  starter: { repos: 3, tokens: 400_000, label: 'Starter' },
-  team: { repos: 15, tokens: 1_000_000, label: 'Team' },
-  pro: { repos: -1, tokens: 2_500_000, label: 'Pro' },
+  free: { repos: 1, tokens: 20_000, label: 'Free' },
+  starter: { repos: 3, tokens: 500_000, label: 'Starter' },
+  team: { repos: 15, tokens: 2_500_000, label: 'Team' },
+  pro: { repos: -1, tokens: 5_000_000, label: 'Pro' },
 } as const;
 
 export const PLAN_ORDER = ['free', 'starter', 'team', 'pro'] as const;
