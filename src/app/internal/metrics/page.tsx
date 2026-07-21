@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { supabaseAdmin } from '@features/shared/supabase';
 import { PLAN_LIMITS, PLAN_ORDER } from '@features/billing/plans';
 
@@ -82,9 +81,9 @@ export default async function InternalMetricsPage() {
       <div className="mb-8 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Business metrics</h1>
         <nav className="flex gap-4 text-xs text-blue-300">
-          <Link href="/internal">status</Link>
-          <Link href="/internal/affiliates">affiliates</Link>
-          <Link href="/internal/feedback">feedback</Link>
+          <a href="/internal">status</a>
+          <a href="/internal/affiliates">affiliates</a>
+          <a href="/internal/feedback">feedback</a>
         </nav>
       </div>
 
