@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Check } from 'lucide-react';
-import { PLAN_LIMITS } from '@features/billing/plan-limits';
+import { PLAN_LIMITS } from '@features/billing/plans';
 import { SectionHeading } from './ui/section-heading';
 import { MarketingCard } from './ui/card';
 import { MarketingButton } from './ui/button';

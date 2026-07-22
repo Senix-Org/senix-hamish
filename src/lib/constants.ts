@@ -5,3 +5,7 @@
  * by the tokens page). Revoking a token frees a slot on either path.
  */
 export const MAX_TOKENS_PER_USER = 10;
+
+// PostHog server-event validation marker (2026-07-17): trivial change to
+// trigger a real pr_review_completed event through the analysis pipeline.
+// Safe to delete.

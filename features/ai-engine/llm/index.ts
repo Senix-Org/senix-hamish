@@ -2,11 +2,12 @@ import { AnthropicProvider } from '@features/ai-engine/llm/anthropic';
 import { GeminiProvider } from '@features/ai-engine/llm/gemini';
 import { GroqProvider } from '@features/ai-engine/llm/groq';
 import { DeepSeekProvider } from '@features/ai-engine/llm/deepseek';
+import { OpenRouterProvider } from '@features/ai-engine/llm/openrouter';
 import type { AnalysisInput, AnalysisResult, LLMProvider, ProviderName } from '@features/ai-engine/llm/types';
 
 export type { AnalysisInput, AnalysisResult, LLMProvider, ProviderName } from '@features/ai-engine/llm/types';
 
-const VALID_PROVIDERS: ProviderName[] = ['anthropic', 'gemini', 'groq', 'deepseek'];
+const VALID_PROVIDERS: ProviderName[] = ['anthropic', 'gemini', 'groq', 'deepseek', 'openrouter'];
 const DEFAULT_PROVIDER: ProviderName = 'groq';
 
 /** The env var that must be present for a provider to be usable for failover. */
@@ -15,12 +16,14 @@ const PROVIDER_API_KEY_ENV: Record<ProviderName, string> = {
   gemini: 'GEMINI_API_KEY',
   groq: 'GROQ_API_KEY',
   deepseek: 'DEEPSEEK_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
 };
 
 let cachedAnthropic: AnthropicProvider | null = null;
 let cachedGemini: GeminiProvider | null = null;
 let cachedGroq: GroqProvider | null = null;
 let cachedDeepSeek: DeepSeekProvider | null = null;
+let cachedOpenRouter: OpenRouterProvider | null = null;
 
 function instantiate(name: ProviderName): LLMProvider {
   if (name === 'anthropic') {
@@ -34,6 +37,10 @@ function instantiate(name: ProviderName): LLMProvider {
   if (name === 'deepseek') {
     if (!cachedDeepSeek) cachedDeepSeek = new DeepSeekProvider();
     return cachedDeepSeek;
+  }
+  if (name === 'openrouter') {
+    if (!cachedOpenRouter) cachedOpenRouter = new OpenRouterProvider();
+    return cachedOpenRouter;
   }
   if (!cachedGroq) cachedGroq = new GroqProvider();
   return cachedGroq;
@@ -107,7 +114,8 @@ function coerceProvider(value: string): ProviderName {
     value === 'anthropic' ||
     value === 'gemini' ||
     value === 'groq' ||
-    value === 'deepseek'
+    value === 'deepseek' ||
+    value === 'openrouter'
   ) {
     return value;
   }

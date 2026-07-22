@@ -128,16 +128,18 @@ export function DashboardUsageMeter({
   const percent = Math.min(100, Math.round((used / Math.max(limit, 1)) * 100));
   const tone =
     percent >= 100 ? 'bg-risk-high' : percent >= 80 ? 'bg-risk-medium' : 'bg-accent';
+  // Percentage-only display; the raw counts stay available in the tooltip.
+  const usageTitle = `${used.toLocaleString()} of ${limit.toLocaleString()} tokens used`;
 
   return (
     <div className="rounded-xl border border-surface-border bg-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-mono uppercase tracking-wider text-muted">Token usage</p>
-          <p className="mt-1 text-sm text-secondary">
-            <span className="font-semibold tabular-nums text-primary">{used.toLocaleString()}</span>
+          <p className="mt-1 text-sm text-secondary" title={usageTitle}>
+            <span className="font-semibold tabular-nums text-primary">{percent}%</span>
             {' '}
-            of {limit.toLocaleString()} this month
+            used this month
           </p>
         </div>
         <span className="rounded-md border border-surface-border bg-surface-raised px-2 py-0.5 text-xs font-medium text-secondary">

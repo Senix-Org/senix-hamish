@@ -68,7 +68,13 @@ export default async function InternalPage() {
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100 p-8 font-mono text-sm">
       <h1 className="text-2xl font-bold mb-2">Internal Status</h1>
-      <p className="text-zinc-500 mb-8">Installs: {installCount ?? 0}</p>
+      <p className="text-zinc-500 mb-2">Installs: {installCount ?? 0}</p>
+      <nav className="mb-8 flex gap-4 text-xs text-blue-300">
+        <a href="/internal/metrics">metrics</a>
+        <a href="/internal/affiliates">affiliates</a>
+        <a href="/internal/feedback">feedback</a>
+        <a href="/internal/test">test</a>
+      </nav>
 
       <section className="mb-10">
         <h2 className="text-lg font-bold mb-3">Last 20 webhook events</h2>

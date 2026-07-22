@@ -5,7 +5,9 @@
 // Workers & Pages -> senix -> Settings -> Variables and Secrets.
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"main": ".open-next/worker.js",
+	// Custom entry: re-exports the OpenNext-generated handler plus the
+	// AnalyzePrWorkflow class (Workflows must be named exports of the Worker).
+	"main": "worker.ts",
 	"name": "senix",
 	// Must be 2024-09-23 or later for Node.js APIs; 2024-12-30 per current docs.
 	"compatibility_date": "2024-12-30",
@@ -17,6 +19,15 @@
 		"directory": ".open-next/assets",
 		"binding": "ASSETS"
 	},
+	"workflows": [
+		{
+			// PR analysis pipeline. Replaces after()/waitUntil dispatch: steps
+			// persist and retry independently, no 30s wall-clock cap.
+			"name": "senix-analyze-pr",
+			"binding": "ANALYZE_PR_WORKFLOW",
+			"class_name": "AnalyzePrWorkflow"
+		}
+	],
 	"services": [
 		{
 			// Self-reference service binding; the service name must match the

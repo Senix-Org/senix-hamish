@@ -100,7 +100,7 @@ const FAQ: Array<{ q: string; a: string }> = [
   },
   {
     q: 'How does Senix review pull requests?',
-    a: 'When a PR is opened or updated, Senix fetches the diff, builds a tree-sitter structural diff of the changed files, and asks a large language model for a concise behavioral summary, a risk level, the detected risk flags, and the specific files reviewers should focus on. The result is posted as a single PR comment that updates on re-pushes.',
+    a: 'When a PR is opened or updated, Senix fetches the diff, builds a structural diff of the changed files using regex-based symbol detection, and asks a large language model for a concise behavioral summary, a risk level, the detected risk flags, and the specific files reviewers should focus on. The result is posted as a single PR comment that updates on re-pushes.',
   },
   {
     q: 'Which AI models does Senix use?',

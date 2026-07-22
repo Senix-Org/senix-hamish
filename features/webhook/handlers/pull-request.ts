@@ -4,6 +4,10 @@ import { enqueue, type JobPayloadMap } from '@features/review-queue/queue';
 import { processAnalyzePr } from '@features/review-queue/worker/analyze-pr';
 import { checkTokenLimit, ESTIMATED_TOKENS_PER_REVIEW } from '@features/billing/plan-limits';
 import { upsertPRComment } from '@features/github-integration/github-comments';
+import {
+  recordPROutcome,
+  incrementCommitsAfterReview,
+} from '@features/review-queue/outcome-recorder';
 import { getAppBaseUrl } from '@features/shared/mcp-config';
 import { findRepository } from './lookup';
 
@@ -36,13 +40,37 @@ type PullRequestPayload = {
     state?: string;
     head?: { sha?: string };
     base?: { sha?: string };
+    merged?: boolean;
+    merged_at?: string | null;
+    closed_at?: string | null;
   };
-  repository?: { id?: number };
+  repository?: { id?: number; full_name?: string };
   installation?: { id?: number };
 };
 
 export async function handlePullRequest(payload: PullRequestPayload): Promise<string> {
   const action = payload.action ?? '';
+
+  // Outcome bookkeeping (migration 014): a closed PR needs no analysis, but
+  // it labels the latest completed review — merged-despite-risk plus, on
+  // merge, the scheduled 24h hotfix scan. Best-effort: recordPROutcome
+  // catches its own errors and never affects webhook handling.
+  if (action === 'closed') {
+    const closedPr = payload.pull_request;
+    const fullName = payload.repository?.full_name;
+    if (closedPr?.number && fullName) {
+      await recordPROutcome({
+        prNumber: closedPr.number,
+        repoFullName: fullName,
+        merged: Boolean(closedPr.merged),
+        mergedAt: closedPr.merged_at ?? null,
+        closedAt: closedPr.closed_at ?? null,
+      });
+      return `pull_request:outcome-recorded:${fullName}#${closedPr.number}:${closedPr.merged ? 'merged' : 'closed'}`;
+    }
+    return 'pull_request:skipped:closed';
+  }
+
   if (!ACTIONS_WE_HANDLE.has(action)) {
     return `pull_request:skipped:${action}`;
   }
@@ -50,6 +78,16 @@ export async function handlePullRequest(payload: PullRequestPayload): Promise<st
   const pr = payload.pull_request;
   const repoPayload = payload.repository;
   const installationId = payload.installation?.id;
+
+  // New commits after a completed review are developer pushback — count them
+  // on the latest completed analysis before kicking off the re-review.
+  // Best-effort: never affects the review flow.
+  if (action === 'synchronize' && pr?.number && repoPayload?.full_name) {
+    await incrementCommitsAfterReview({
+      prNumber: pr.number,
+      repoFullName: repoPayload.full_name,
+    });
+  }
 
   if (
     !pr ||
@@ -146,7 +184,7 @@ export async function handlePullRequest(payload: PullRequestPayload): Promise<st
     baseSha: pr.base.sha,
   };
 
-  const dispatchOutcome = dispatchAnalyzePr(jobPayload);
+  const dispatchOutcome = await dispatchAnalyzePr(jobPayload);
 
   return `pull_request:${action}:${repo.full_name}#${pr.number}:${dispatchOutcome}`;
 }
@@ -188,25 +226,59 @@ async function postLimitReachedComment(input: {
   }
 }
 
-type DispatchOutcome = 'after-dispatched';
+type DispatchOutcome = 'workflow-dispatched' | 'after-dispatched';
+
+/** Minimal shape of a Workflow binding; avoids depending on runtime types. */
+type WorkflowBinding = {
+  create(options?: { id?: string; params?: unknown }): Promise<unknown>;
+};
 
 /**
- * Schedule the analysis to run after the webhook responds 200 to GitHub.
- *
- * Next.js `after()` runs the callback once the response has been sent, so
- * GitHub gets its fast acknowledgement while the analysis runs in the
- * background under this route's maxDuration. We call `processAnalyzePr`
- * directly instead of POSTing to the internal analyze-pr route: removing
- * the internal HTTP hop removes a failure point and lets the webhook
- * route's maxDuration govern the analysis time.
- *
- * `processAnalyzePr` records its own success/failure on the analysis row
- * (including a finally-block safety net), so a thrown error here is already
- * reflected in the DB. As a last-resort recovery for infrastructure faults
- * (e.g. the row was never claimed), we enqueue to Redis so the standalone
- * polling worker can still pick the job up.
+ * Resolve the ANALYZE_PR_WORKFLOW binding when running on Cloudflare.
+ * Returns null anywhere the binding does not exist (node dev server, tests,
+ * the standalone worker), which selects the legacy after() path below.
  */
-function dispatchAnalyzePr(payload: JobPayloadMap['analyze-pr']): DispatchOutcome {
+async function getAnalyzeWorkflowBinding(): Promise<WorkflowBinding | null> {
+  try {
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+    const { env } = getCloudflareContext();
+    const binding = (env as Record<string, unknown>).ANALYZE_PR_WORKFLOW;
+    return binding ? (binding as WorkflowBinding) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Dispatch the analysis job.
+ *
+ * Preferred path: create a Cloudflare Workflow instance (AnalyzePrWorkflow)
+ * and return 200 to GitHub immediately. Workflows persist and retry each
+ * pipeline step independently and have no 30-second wall-clock cap — the
+ * after()/waitUntil path was silently cancelled ~30s after the response
+ * (see the 2026-07-17 incident in CLAUDE.md).
+ *
+ * Legacy path (no binding, e.g. local dev/tests, or create() failed): run
+ * processAnalyzePr in a Next.js after() callback exactly as before, with the
+ * Redis queue as the last-resort fallback so the standalone polling worker
+ * can pick the job up.
+ */
+async function dispatchAnalyzePr(payload: JobPayloadMap['analyze-pr']): Promise<DispatchOutcome> {
+  const workflow = await getAnalyzeWorkflowBinding();
+  if (workflow) {
+    try {
+      // The analysis id is unique per analysis row, and Workflows reject a
+      // duplicate instance id — a bonus dedup layer on top of claimAnalysis.
+      await workflow.create({ id: payload.analysisId, params: payload });
+      return 'workflow-dispatched';
+    } catch (err: unknown) {
+      console.error('[pull-request] workflow dispatch failed, falling back to after()', {
+        analysisId: payload.analysisId,
+        message: errorMessage(err),
+      });
+    }
+  }
+
   after(async () => {
     try {
       await processAnalyzePr(payload);

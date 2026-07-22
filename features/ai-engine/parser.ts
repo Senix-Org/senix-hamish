@@ -1,37 +1,7 @@
-import { createRequire } from 'node:module';
-import type Parser from 'tree-sitter';
-
 export type SupportedLanguage = 'javascript' | 'typescript' | 'tsx' | 'python';
 
 /**
- * tree-sitter and its grammars are native Node addons (.node binaries).
- * They load fine in a real Node.js process (the standalone worker, next dev,
- * vitest) but cannot load in the Cloudflare Workers runtime, which has no
- * native addon support. All loading is therefore lazy and guarded: when the
- * addon cannot be loaded, parseFile returns null and the structural diff
- * degrades to "no symbol detail" instead of crashing the route at import
- * time.
- */
-
-const parserCache: Partial<Record<SupportedLanguage, Parser>> = {};
-
-let nativeUnavailable = false;
-
-/**
- * Require a module through an indirection that bundlers (Next/OpenNext
- * esbuild) cannot statically analyze, so the native addons are neither
- * bundled nor build-time errors. In a real Node.js runtime this resolves
- * from node_modules; in the Workers runtime createRequire exists under
- * nodejs_compat but cannot resolve unbundled modules, so it throws and
- * callers degrade gracefully.
- */
-function dynamicRequire(name: string): unknown {
-  const req = createRequire(import.meta.url);
-  return req(name);
-}
-
-/**
- * Detect the language of a file based on its extension.
+ * Detection of the language of a file based on its extension.
  *
  * @param filename - The file name or path to inspect.
  * @returns The detected language, or `null` if the extension is not supported.
@@ -57,62 +27,77 @@ export function detectLanguage(filename: string): SupportedLanguage | null {
   }
 }
 
-function getParser(language: SupportedLanguage): Parser | null {
-  const cached = parserCache[language];
-  if (cached) return cached;
-  if (nativeUnavailable) return null;
-
-  try {
-    const ParserCtor = dynamicRequire('tree-sitter') as new () => Parser;
-    const parser = new ParserCtor();
-
-    switch (language) {
-      case 'javascript':
-        parser.setLanguage(dynamicRequire('tree-sitter-javascript'));
-        break;
-      case 'typescript':
-        parser.setLanguage(
-          (dynamicRequire('tree-sitter-typescript') as { typescript: unknown }).typescript
-        );
-        break;
-      case 'tsx':
-        parser.setLanguage((dynamicRequire('tree-sitter-typescript') as { tsx: unknown }).tsx);
-        break;
-      case 'python':
-        parser.setLanguage(dynamicRequire('tree-sitter-python'));
-        break;
-    }
-
-    parserCache[language] = parser;
-    return parser;
-  } catch (err) {
-    if (!nativeUnavailable) {
-      nativeUnavailable = true;
-      console.warn(
-        '[parser] native tree-sitter unavailable in this runtime; structural diff will have no symbol detail',
-        { message: err instanceof Error ? err.message : String(err) }
-      );
-    }
-    return null;
-  }
-}
-
 /**
- * Parse source code into a tree-sitter Tree using the appropriate grammar.
- * Parsers are loaded lazily and cached per language.
+ * Parse source code and extract symbol names (functions, classes, methods)
+ * using language-specific regex patterns.
+ *
+ * This is a lightweight replacement for web-tree-sitter. It runs synchronously
+ * with zero dependencies and works correctly in all environments, including
+ * Cloudflare Workers (where WebAssembly.instantiate for arbitrary bytes is
+ * blocked).
  *
  * @param content - The source code to parse.
- * @param language - The language grammar to use.
- * @returns The resulting tree-sitter Tree, or `null` if parsing fails or the
- *   native parser cannot load in this runtime.
+ * @param language - The language to use for parsing.
+ * @returns An array of symbol names found in the content, or `null` if the
+ *   language is not supported.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function parseFile(content: string, language: SupportedLanguage): any {
-  try {
-    const parser = getParser(language);
-    if (!parser) return null;
-    return parser.parse(content);
-  } catch {
-    return null;
+export function parseFile(content: string, language: string): string[] | null {
+  const symbols: string[] = [];
+
+  switch (language) {
+    case 'javascript':
+    case 'typescript':
+    case 'tsx': {
+      let m: RegExpExecArray | null;
+
+      // Named functions: export async function name(...)
+      const funcRe = /(?:export\s+)?(?:async\s+)?function\s+(\w+)/g;
+      while ((m = funcRe.exec(content)) !== null) {
+        symbols.push(m[1]);
+      }
+
+      // Arrow functions assigned to const: const name = (async) => (...)
+      const arrowRe = /(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\(/g;
+      while ((m = arrowRe.exec(content)) !== null) {
+        symbols.push(m[1]);
+      }
+
+      // Classes: export class Name
+      const classRe = /(?:export\s+)?class\s+(\w+)/g;
+      while ((m = classRe.exec(content)) !== null) {
+        symbols.push(m[1]);
+      }
+
+      break;
+    }
+
+    case 'python': {
+      let m: RegExpExecArray | null;
+
+      // Top-level functions: def name(...):
+      const defRe = /^def\s+(\w+)/gm;
+      while ((m = defRe.exec(content)) !== null) {
+        symbols.push(m[1]);
+      }
+
+      // Classes: class Name:
+      const pyClassRe = /^class\s+(\w+)/gm;
+      while ((m = pyClassRe.exec(content)) !== null) {
+        symbols.push(m[1]);
+      }
+
+      // Methods (indented def): def name(...):
+      const methodRe = /^\s+def\s+(\w+)/gm;
+      while ((m = methodRe.exec(content)) !== null) {
+        symbols.push(m[1]);
+      }
+
+      break;
+    }
+
+    default:
+      return null;
   }
+
+  return symbols;
 }

@@ -1,50 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createHmac } from 'node:crypto';
-import { verifyWhopSignature, planForWhopProductId, whopProductIdForPlan } from '@features/billing/whop';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { planForWhopProductId, whopProductIdForPlan } from '@features/billing/whop';
 
 /**
- * Proves: Whop webhook signatures are verified (forged/replayed payloads
- * rejected), and product-id to plan mapping is correct in both directions.
- * Failure means: an attacker could forge billing events to grant paid plans.
+ * Proves: product-id to plan mapping is correct in both directions.
+ * (Webhook signature verification lives in the Whop SDK's webhooks.unwrap,
+ * covered by features/billing/__tests__/whop-webhook.test.ts; the old manual
+ * verification helper in whop.ts was dead code and has been removed.)
+ * Failure means: billing events would map to the wrong plan.
  */
 
-const SECRET = 'whop-secret';
-
 beforeEach(() => {
-  process.env.WHOP_WEBHOOK_SECRET = SECRET;
   process.env.WHOP_STARTER_PRODUCT_ID = 'prod_starter';
   process.env.WHOP_TEAM_PRODUCT_ID = 'prod_team';
   process.env.WHOP_PRO_PRODUCT_ID = 'prod_pro';
-});
-
-function sign(body: string) {
-  return createHmac('sha256', SECRET).update(body).digest('hex');
-}
-
-describe('verifyWhopSignature', () => {
-  it('accepts a valid signature with sha256= prefix', () => {
-    const body = '{"type":"x"}';
-    expect(verifyWhopSignature(body, `sha256=${sign(body)}`)).toBe(true);
-  });
-
-  it('accepts a valid signature with v1= prefix', () => {
-    const body = '{"type":"x"}';
-    expect(verifyWhopSignature(body, `v1=${sign(body)}`)).toBe(true);
-  });
-
-  it('rejects a forged signature', () => {
-    expect(verifyWhopSignature('{"type":"x"}', 'sha256=' + 'a'.repeat(64))).toBe(false);
-  });
-
-  it('rejects a missing signature', () => {
-    expect(verifyWhopSignature('{}', null)).toBe(false);
-  });
-
-  it('rejects when the secret is not configured', () => {
-    delete process.env.WHOP_WEBHOOK_SECRET;
-    const body = '{}';
-    expect(verifyWhopSignature(body, `sha256=${sign(body)}`)).toBe(false);
-  });
 });
 
 describe('product/plan mapping', () => {
