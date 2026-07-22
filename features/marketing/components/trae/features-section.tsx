@@ -177,13 +177,13 @@ export function TraeFeaturesSection(): React.ReactElement {
         <div className="mt-0 rounded-b border border-t-0 border-white/[0.08] bg-[#0d0e10] p-6 md:p-8">
           <div className="grid gap-6 lg:grid-cols-[1fr_1.5fr] lg:items-start">
             <div>
-              <p className="text-sm font-medium text-[#f5f9fe]">{activeTabData.headline}</p>
-              <p className="mt-2 text-sm leading-relaxed text-[#a6aab5]">{activeTabData.desc}</p>
+              <p className="text-sm font-medium text-[#ffffff]">{activeTabData.headline}</p>
+              <p className="mt-2 text-sm leading-relaxed text-[#c9c5d2]">{activeTabData.desc}</p>
 
               {activeTab === 'pr' && (
                 <div className="mt-6 space-y-3">
                   {['Behavioral summary', 'Risk level (high / medium / low)', 'Focus files', 'Risk tags'].map((item) => (
-                    <div key={item} className="flex items-center gap-2.5 text-sm text-[#a6aab5]">
+                    <div key={item} className="flex items-center gap-2.5 text-sm text-[#c9c5d2]">
                       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#32f08c]" />
                       {item}
                     </div>
@@ -193,13 +193,13 @@ export function TraeFeaturesSection(): React.ReactElement {
 
               {activeTab === 'mcp' && (
                 <div className="mt-6">
-                  <div className="rounded border border-white/[0.08] bg-[#0a0b0d] p-4 font-mono text-[12px] text-[#a6aab5]">
-                    <div className="text-[#787d87]"># cursor mcp config</div>
+                  <div className="rounded border border-white/[0.08] bg-[#09080c] p-4 font-mono text-[12px] text-[#c9c5d2]">
+                    <div className="text-[#8b8794]"># cursor mcp config</div>
                     <div className="mt-2 text-[#32f08c]">senix:</div>
-                    <div className="ml-4 text-[#a6aab5]">url: https://mcp.senix.dev</div>
-                    <div className="ml-4 text-[#a6aab5]">token: sk-senix-...</div>
+                    <div className="ml-4 text-[#c9c5d2]">url: https://mcp.senix.dev</div>
+                    <div className="ml-4 text-[#c9c5d2]">token: sk-senix-...</div>
                   </div>
-                  <p className="mt-3 text-xs text-[#787d87]">Add to your Cursor MCP config and ask Senix about any PR.</p>
+                  <p className="mt-3 text-xs text-[#8b8794]">Add to your Cursor MCP config and ask Senix about any PR.</p>
                 </div>
               )}
 
@@ -208,7 +208,7 @@ export function TraeFeaturesSection(): React.ReactElement {
                   {['Cursor', 'Claude Code', 'GitHub Copilot', 'Windsurf', 'VS Code', 'Any IDE via MCP'].map((name) => (
                     <span
                       key={name}
-                      className="flex items-center gap-2 rounded border border-white/[0.08] bg-[#0a0b0d] px-3 py-2 text-xs text-[#a6aab5] transition hover:border-[#32f08c]/30 hover:text-[#f5f9fe]"
+                      className="flex items-center gap-2 rounded border border-white/[0.08] bg-[#09080c] px-3 py-2 text-xs text-[#c9c5d2] transition hover:border-[#32f08c]/30 hover:text-[#ffffff]"
                     >
                       <IntegrationIcon name={name} />
                       {name}
@@ -227,22 +227,22 @@ export function TraeFeaturesSection(): React.ReactElement {
                 />
               )}
               {activeTab === 'mcp' && (
-                <div className="bg-[#0a0b0d] p-5 font-mono text-[12px] min-h-[200px]">
-                  <div className="text-[#787d87]">senix &gt; analyze PR #247</div>
-                  <div className="mt-3 text-[#f5f9fe]">PR #247: Update payment flow</div>
+                <div className="bg-[#09080c] p-5 font-mono text-[12px] min-h-[200px]">
+                  <div className="text-[#8b8794]">senix &gt; analyze PR #247</div>
+                  <div className="mt-3 text-[#ffffff]">PR #247: Update payment flow</div>
                   <div className="mt-1 text-[#f0616a] font-medium">Risk: HIGH</div>
                   <div className="mt-3 space-y-1">
-                    <div className="text-[#a6aab5]"><span className="text-[#f0616a]">!</span> payment-logic-change at src/checkout.ts:84</div>
-                    <div className="text-[#a6aab5]"><span className="text-[#e0a23a]">!</span> removed-validation at src/api/orders.ts:31</div>
-                    <div className="text-[#a6aab5]"><span className="text-[#3ecf8e]">✓</span> new-external-api at src/stripe.ts:12</div>
+                    <div className="text-[#c9c5d2]"><span className="text-[#f0616a]">!</span> payment-logic-change at src/checkout.ts:84</div>
+                    <div className="text-[#c9c5d2]"><span className="text-[#e0a23a]">!</span> removed-validation at src/api/orders.ts:31</div>
+                    <div className="text-[#c9c5d2]"><span className="text-[#3ee1a3]">✓</span> new-external-api at src/stripe.ts:12</div>
                   </div>
-                  <div className="mt-4 text-[#787d87]">Focus files: src/checkout.ts, src/api/orders.ts</div>
+                  <div className="mt-4 text-[#8b8794]">Focus files: src/checkout.ts, src/api/orders.ts</div>
                 </div>
               )}
               {activeTab === 'integrations' && (
-                <div className="bg-[#0a0b0d] p-5 min-h-[200px] flex flex-col justify-between">
+                <div className="bg-[#09080c] p-5 min-h-[200px] flex flex-col justify-between">
                   <div>
-                    <p className="text-xs font-medium text-[#f5f9fe]">How it connects</p>
+                    <p className="text-xs font-medium text-[#ffffff]">How it connects</p>
                     <ol className="mt-4 space-y-4">
                       {[
                         { n: '01', t: 'Install the GitHub App', d: 'One click. Pick your repos.' },
@@ -252,8 +252,8 @@ export function TraeFeaturesSection(): React.ReactElement {
                         <li key={step.n} className="flex gap-3">
                           <span className="font-mono text-[10px] text-[#32f08c] mt-0.5 shrink-0">{step.n}</span>
                           <div>
-                            <p className="text-xs font-medium text-[#f5f9fe]">{step.t}</p>
-                            <p className="text-xs text-[#787d87]">{step.d}</p>
+                            <p className="text-xs font-medium text-[#ffffff]">{step.t}</p>
+                            <p className="text-xs text-[#8b8794]">{step.d}</p>
                           </div>
                         </li>
                       ))}
@@ -270,8 +270,8 @@ export function TraeFeaturesSection(): React.ReactElement {
         {/* Row 1: Detected risks (wide) + 30s stat (narrow) */}
         <div data-trae-item className="trae-bento-span-8 trae-card trae-spotlight p-6 opacity-0">
           <div className="trae-spotlight-inner" />
-          <p className="font-mono text-[13px] font-medium text-[#f5f9fe]">Detected risks</p>
-          <p className="mt-2 text-sm text-[#a6aab5]">
+          <p className="font-mono text-[13px] font-medium text-[#ffffff]">Detected risks</p>
+          <p className="mt-2 text-sm text-[#c9c5d2]">
             Every flag points at a specific file and line. No essays, no fluff.
           </p>
           <div ref={flagsRef} className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -279,7 +279,7 @@ export function TraeFeaturesSection(): React.ReactElement {
               <span
                 key={flag}
                 data-risk-flag={flag}
-                className={`rounded border border-white/[0.08] bg-[#0a0b0d] px-2.5 py-2 text-center font-mono text-[11px] text-[#a6aab5] transition hover:border-[#32f08c]/30 hover:text-[#f5f9fe] ${
+                className={`rounded border border-white/[0.08] bg-[#09080c] px-2.5 py-2 text-center font-mono text-[11px] text-[#c9c5d2] transition hover:border-[#32f08c]/30 hover:text-[#ffffff] ${
                   reduced ? '' : 'opacity-0'
                 }`}
               >
@@ -293,11 +293,11 @@ export function TraeFeaturesSection(): React.ReactElement {
           <div className="trae-spotlight-inner" />
           <div>
             <p className="trae-gradient-text font-mono text-5xl font-medium tabular-nums">30s</p>
-            <p className="mt-2 text-sm text-[#a6aab5]">average analysis time</p>
+            <p className="mt-2 text-sm text-[#c9c5d2]">average analysis time</p>
           </div>
           <div className="mt-6 space-y-3">
             {['Zero config', 'Structural diff', 'Risk-tagged output'].map((item) => (
-              <div key={item} className="flex items-center gap-2 text-sm text-[#787d87]">
+              <div key={item} className="flex items-center gap-2 text-sm text-[#8b8794]">
                 <span className="h-1 w-1 shrink-0 rounded-full bg-[#32f08c]/50" aria-hidden />
                 {item}
               </div>
@@ -312,8 +312,8 @@ export function TraeFeaturesSection(): React.ReactElement {
           className="trae-bento-span-8 trae-card trae-spotlight p-6 opacity-0 md:col-span-12"
         >
           <div className="trae-spotlight-inner" />
-          <p className="text-sm font-medium text-[#f5f9fe]">How it works</p>
-          <p className="mt-1 text-sm text-[#a6aab5]">Three steps. Thirty seconds.</p>
+          <p className="text-sm font-medium text-[#ffffff]">How it works</p>
+          <p className="mt-1 text-sm text-[#c9c5d2]">Three steps. Thirty seconds.</p>
           <ol className="mt-6 grid gap-4 md:grid-cols-3">
             {[
               { n: '01', title: 'Install on GitHub', body: 'One click from the App store. Pick the repos you want analyzed.' },
@@ -322,8 +322,8 @@ export function TraeFeaturesSection(): React.ReactElement {
             ].map((step) => (
               <li key={step.n} className="border-t border-white/[0.08] pt-4">
                 <span className="font-mono text-xs text-[#32f08c]">{step.n}</span>
-                <p className="mt-2 text-sm font-medium text-[#f5f9fe]">{step.title}</p>
-                <p className="mt-1 text-xs leading-relaxed text-[#a6aab5]">{step.body}</p>
+                <p className="mt-2 text-sm font-medium text-[#ffffff]">{step.title}</p>
+                <p className="mt-1 text-xs leading-relaxed text-[#c9c5d2]">{step.body}</p>
               </li>
             ))}
           </ol>

@@ -26,7 +26,7 @@ export function NavLink({ href, children, className = '' }: NavLinkProps): React
       {children}
       <span
         aria-hidden
-        className={`nav-link-underline absolute bottom-0 left-0 h-px bg-green-500 transition-all duration-300 ease-out ${
+        className={`nav-link-underline absolute bottom-0 left-0 h-px bg-[#32f08c] transition-all duration-300 ease-out ${
           isActive ? 'w-full opacity-100' : 'w-0 opacity-0 group-hover:w-full group-hover:opacity-100 group-focus-visible:w-full group-focus-visible:opacity-100'
         }`}
       />

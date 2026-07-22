@@ -129,7 +129,7 @@ export function TraeCompareSection(): React.ReactElement {
         className="pointer-events-none absolute right-[8%] top-1/2 h-[440px] w-[560px] -translate-y-1/2 opacity-50"
         style={{
           background:
-            'radial-gradient(ellipse at center, rgba(50,240,140,0.14) 0%, rgba(50,240,140,0.04) 45%, transparent 70%)',
+            'radial-gradient(ellipse at center, rgba(50, 240, 140,0.14) 0%, rgba(50, 240, 140,0.04) 45%, transparent 70%)',
         }}
       />
 
@@ -149,7 +149,7 @@ export function TraeCompareSection(): React.ReactElement {
             data-compare-without
             className={`trae-compare-panel trae-compare-panel-dim trae-card p-6 md:p-8 ${hidden}`}
           >
-            <p className="font-mono text-[11px] uppercase tracking-wider text-[#787d87]">
+            <p className="font-mono text-[11px] uppercase tracking-wider text-[#8b8794]">
               Without Senix
             </p>
             <ul className="mt-6 space-y-4">
@@ -157,9 +157,9 @@ export function TraeCompareSection(): React.ReactElement {
                 <li
                   key={item}
                   data-compare-without-item
-                  className={`flex items-start gap-3 text-sm text-[#787d87] ${hidden}`}
+                  className={`flex items-start gap-3 text-sm text-[#8b8794] ${hidden}`}
                 >
-                  <X size={16} className="mt-0.5 shrink-0 text-[#787d87]/80" strokeWidth={2} aria-hidden />
+                  <X size={16} className="mt-0.5 shrink-0 text-[#8b8794]/80" strokeWidth={2} aria-hidden />
                   {item}
                 </li>
               ))}
@@ -187,7 +187,7 @@ export function TraeCompareSection(): React.ReactElement {
               className="absolute inset-x-0 top-0 h-px"
               style={{
                 background:
-                  'linear-gradient(90deg, transparent 0%, rgba(50,240,140,0.6) 40%, rgba(160,253,231,0.5) 60%, transparent 100%)',
+                  'linear-gradient(90deg, transparent 0%, rgba(50, 240, 140,0.6) 40%, rgba(160, 253, 231,0.5) 60%, transparent 100%)',
               }}
             />
             <p className="font-mono text-[11px] uppercase tracking-wider text-[#32f08c]">

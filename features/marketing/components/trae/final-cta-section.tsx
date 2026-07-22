@@ -141,7 +141,7 @@ export function TraeFinalCtaSection(): React.ReactElement {
         className="pointer-events-none absolute left-[18%] top-0 h-[520px] w-[640px] -translate-y-1/2 opacity-80"
         style={{
           background:
-            'radial-gradient(ellipse at center, rgba(50,240,140,0.2) 0%, rgba(50,240,140,0.04) 48%, transparent 72%)',
+            'radial-gradient(ellipse at center, rgba(50, 240, 140,0.2) 0%, rgba(50, 240, 140,0.04) 48%, transparent 72%)',
         }}
       />
 
@@ -151,7 +151,7 @@ export function TraeFinalCtaSection(): React.ReactElement {
         className="pointer-events-none absolute right-[12%] top-1/3 h-[380px] w-[480px] opacity-60"
         style={{
           background:
-            'radial-gradient(ellipse at center, rgba(160,253,231,0.08) 0%, rgba(50,240,140,0.04) 45%, transparent 70%)',
+            'radial-gradient(ellipse at center, rgba(160, 253, 231,0.08) 0%, rgba(50, 240, 140,0.04) 45%, transparent 70%)',
         }}
       />
 
@@ -169,7 +169,7 @@ export function TraeFinalCtaSection(): React.ReactElement {
           Ready when you are
         </p>
 
-        <h2 className="trae-final-cta-headline mt-5 text-3xl font-medium tracking-tight text-[#f5f9fe] md:text-5xl md:leading-tight lg:text-6xl">
+        <h2 className="trae-final-cta-headline mt-5 text-3xl font-medium tracking-tight text-[#ffffff] md:text-5xl md:leading-tight lg:text-6xl">
           <span className="inline-flex flex-wrap justify-center gap-x-[0.28em]">
             {HEADLINE_WORDS.map((word) => (
               <span key={word} data-cta-word className={`inline-block ${hidden}`}>
@@ -197,23 +197,23 @@ export function TraeFinalCtaSection(): React.ReactElement {
       {/* CodeRabbit-style scan line shimmer on the CTA */}
       <div
         data-cta-actions
-        className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row"
+        className="mt-10 flex w-full flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center"
       >
-        <div data-cta-action className={`trae-shimmer-btn rounded-md ${hidden}`}>
-          <SignInButton label="Get started free" variant="trae" />
+        <div data-cta-action className={`trae-shimmer-btn rounded-md sm:inline-flex ${hidden}`}>
+          <SignInButton label="Get started free" variant="trae" className="w-full sm:w-auto" />
         </div>
-          <div data-cta-action className={hidden}>
-            <TraeButton variant="outline" href="/docs/installation" className="h-10 px-6 xl:h-14">
+          <div data-cta-action className={`w-full sm:w-auto ${hidden}`}>
+            <TraeButton variant="outline" href="/docs/installation" className="h-10 w-full px-6 sm:w-auto xl:h-14">
               Installation guide
             </TraeButton>
           </div>
         </div>
 
-        <p data-cta-footnote className={`mt-7 text-sm text-[#787d87] ${hidden}`}>
+        <p data-cta-footnote className={`mt-7 text-sm text-[#8b8794] ${hidden}`}>
           Questions about data handling?{' '}
           <Link
             href="/privacy"
-            className="text-[#32f08c] underline-offset-4 transition hover:text-[#3ecf8e] hover:underline"
+            className="text-[#32f08c] underline-offset-4 transition hover:text-[#3ee1a3] hover:underline"
           >
             Privacy policy
           </Link>

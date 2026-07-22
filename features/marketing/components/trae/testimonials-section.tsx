@@ -65,11 +65,11 @@ const ROW_TWO: Testimonial[] = [
 
 /** Brand-aligned avatar fills (green/teal spectrum, not random hues). */
 const AVATAR_GRADIENTS = [
-  'linear-gradient(135deg, rgba(50,240,140,0.28) 0%, rgba(16,42,32,0.95) 52%, rgba(10,11,13,1) 100%)',
+  'linear-gradient(135deg, rgba(50, 240, 140,0.28) 0%, rgba(16,42,32,0.95) 52%, rgba(10,11,13,1) 100%)',
   'linear-gradient(135deg, rgba(62,225,163,0.24) 0%, rgba(20,48,38,0.95) 52%, rgba(10,11,13,1) 100%)',
-  'linear-gradient(135deg, rgba(96,242,189,0.22) 0%, rgba(18,44,36,0.95) 52%, rgba(10,11,13,1) 100%)',
-  'linear-gradient(135deg, rgba(160,253,231,0.18) 0%, rgba(22,52,42,0.95) 52%, rgba(10,11,13,1) 100%)',
-  'linear-gradient(135deg, rgba(50,240,140,0.2) 0%, rgba(14,36,28,0.95) 52%, rgba(10,11,13,1) 100%)',
+  'linear-gradient(135deg, rgba(96, 242, 189,0.22) 0%, rgba(18,44,36,0.95) 52%, rgba(10,11,13,1) 100%)',
+  'linear-gradient(135deg, rgba(160, 253, 231,0.18) 0%, rgba(22,52,42,0.95) 52%, rgba(10,11,13,1) 100%)',
+  'linear-gradient(135deg, rgba(50, 240, 140,0.2) 0%, rgba(14,36,28,0.95) 52%, rgba(10,11,13,1) 100%)',
   'linear-gradient(135deg, rgba(15,220,120,0.26) 0%, rgba(18,46,34,0.95) 52%, rgba(10,11,13,1) 100%)',
   'linear-gradient(135deg, rgba(80,230,160,0.22) 0%, rgba(20,50,38,0.95) 52%, rgba(10,11,13,1) 100%)',
   'linear-gradient(135deg, rgba(110,245,200,0.2) 0%, rgba(16,40,32,0.95) 52%, rgba(10,11,13,1) 100%)',
@@ -93,15 +93,15 @@ function TestimonialCard({ quote, name, handle }: Testimonial): React.ReactEleme
       <p className="text-sm leading-relaxed text-[#d8dce3] md:text-[15px]">&ldquo;{quote}&rdquo;</p>
       <div className="mt-6 flex items-center gap-3">
         <div
-          className="trae-testimonial-avatar flex h-9 w-9 shrink-0 items-center justify-center rounded-sm text-[11px] font-medium text-[#f5f9fe] ring-1 ring-[#32f08c]/20"
+          className="trae-testimonial-avatar flex h-9 w-9 shrink-0 items-center justify-center rounded-sm text-[11px] font-medium text-[#ffffff] ring-1 ring-[#32f08c]/20"
           style={{ background: avatarGradient(name) }}
           aria-hidden
         >
           {initials}
         </div>
         <div className="min-w-0 text-left">
-          <p className="truncate text-sm font-medium text-[#f5f9fe]">{name}</p>
-          <p className="truncate text-xs text-[#787d87]">{handle}</p>
+          <p className="truncate text-sm font-medium text-[#ffffff]">{name}</p>
+          <p className="truncate text-xs text-[#8b8794]">{handle}</p>
         </div>
       </div>
     </article>
@@ -275,7 +275,7 @@ export function TraeTestimonialsSection(): React.ReactElement {
         className="pointer-events-none absolute left-1/2 top-1/2 h-[480px] w-[720px] -translate-x-1/2 -translate-y-1/2 opacity-70"
         style={{
           background:
-            'radial-gradient(ellipse at center, rgba(50,240,140,0.1) 0%, rgba(50,240,140,0.03) 42%, transparent 72%)',
+            'radial-gradient(ellipse at center, rgba(50, 240, 140,0.1) 0%, rgba(50, 240, 140,0.03) 42%, transparent 72%)',
         }}
       />
 
@@ -283,7 +283,7 @@ export function TraeTestimonialsSection(): React.ReactElement {
         <p data-testimonials-label className={`trae-section-label ${hidden}`}>
           Social proof
         </p>
-        <h2 className="mt-4 text-3xl font-medium tracking-tight text-[#f5f9fe] md:text-5xl md:leading-tight">
+        <h2 className="mt-4 text-3xl font-medium tracking-tight text-[#ffffff] md:text-5xl md:leading-tight">
           <span className="inline-flex flex-wrap justify-center gap-x-[0.28em]">
             {['Loved', 'by'].map((word) => (
               <span key={word} data-testimonials-word className={`inline-block ${hidden}`}>
@@ -307,12 +307,12 @@ export function TraeTestimonialsSection(): React.ReactElement {
 
         {/* CodeRabbit-style featured quote bar */}
         <div className={`mx-auto mt-10 max-w-2xl rounded border border-[#32f08c]/20 bg-[#32f08c]/[0.04] px-6 py-5 text-left ${hidden}`} data-testimonials-word>
-          <p className="text-sm leading-relaxed md:text-base" style={{ color: '#f5f9fe' }}>
+          <p className="text-sm leading-relaxed md:text-base" style={{ color: '#ffffff' }}>
             &ldquo;Senix caught a hardcoded API key in a Copilot-generated PR before it merged. The 30-second turnaround is genuinely impressive.&rdquo;
           </p>
           <div className="mt-3 flex items-center gap-2">
             <span className="h-1.5 w-1.5 rounded-full bg-[#32f08c]" aria-hidden />
-            <p className="text-xs font-medium text-[#a6aab5]">Senior Engineer, Series B startup</p>
+            <p className="text-xs font-medium text-[#c9c5d2]">Senior Engineer, Series B startup</p>
           </div>
         </div>
       </div>
