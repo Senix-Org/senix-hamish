@@ -18,6 +18,7 @@ const h = vi.hoisted(() => ({
   postComment: vi.fn(),
   finalize: vi.fn(),
   trueUp: vi.fn(),
+  finalizeTerminal: vi.fn(async () => 'finalized-and-refunded'),
   releaseClaim: vi.fn(async () => undefined),
   updates: [] as Array<Record<string, unknown>>,
 }));
@@ -29,6 +30,7 @@ vi.mock('@features/review-queue/workflow/steps', () => ({
   postAnalysisComment: h.postComment,
   finalizeAnalysis: h.finalize,
   trueUpTokenUsage: h.trueUp,
+  finalizeAnalysisAsTerminal: h.finalizeTerminal,
 }));
 
 vi.mock('@features/review-queue/queue', () => ({
@@ -130,13 +132,18 @@ describe('AnalyzePrWorkflow', () => {
     expect(h.finalize).toHaveBeenCalled();
   });
 
-  it('marks the analysis failed, releases the claim, and rethrows on step failure', async () => {
+  it('marks the analysis failed, refunds the reservation, releases the claim, and rethrows on step failure', async () => {
     h.buildDiff.mockRejectedValue(new Error('github 502'));
 
     await expect(run()).rejects.toThrow('github 502');
 
     expect(h.calls).toContain('mark-analysis-failed');
-    expect(h.updates[0]).toMatchObject({ status: 'failed', error_message: 'github 502' });
+    expect(h.finalizeTerminal).toHaveBeenCalledWith(
+      job.analysisId,
+      job.userId,
+      'failed',
+      'github 502'
+    );
     expect(h.releaseClaim).toHaveBeenCalledWith('a1');
     expect(h.finalize).not.toHaveBeenCalled();
   });

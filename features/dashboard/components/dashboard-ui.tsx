@@ -1,5 +1,7 @@
 import Link from 'next/link';
+import { Coins } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { formatCredits, type CreditBalance } from '@features/billing/credit-packs';
 
 /**
  * Metric tile for the dashboard overview grid.
@@ -115,15 +117,19 @@ export function DashboardQuickLink({
 
 /**
  * Monthly token usage meter. Shown on the overview when plan data is available.
+ * Also surfaces any purchased credit-pack balance so top-ups are visible at a
+ * glance without leaving the dashboard.
  */
 export function DashboardUsageMeter({
   used,
   limit,
   planLabel,
+  creditBalance,
 }: {
   used: number;
   limit: number;
   planLabel: string;
+  creditBalance?: CreditBalance | null;
 }): React.ReactElement {
   const percent = Math.min(100, Math.round((used / Math.max(limit, 1)) * 100));
   const tone =
@@ -160,6 +166,22 @@ export function DashboardUsageMeter({
           </Link>
         )}
       </div>
+
+      {creditBalance && creditBalance.totalCredits > 0 && (
+        <div className="mt-4 flex items-center justify-between border-t border-surface-border pt-4">
+          <div className="flex items-center gap-2 text-sm text-secondary">
+            <Coins size={16} className="text-accent" />
+            <span>Credit balance</span>
+          </div>
+          <Link
+            href="/dashboard/billing"
+            className="text-sm font-semibold tabular-nums text-primary hover:text-accent"
+            title={`${creditBalance.totalCredits.toLocaleString()} tokens available from credit packs`}
+          >
+            {formatCredits(creditBalance.totalCredits)} tokens
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

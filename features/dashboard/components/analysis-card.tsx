@@ -28,6 +28,16 @@ const FAILED_BADGE = { label: 'Review Failed', className: 'text-risk-high bg-ris
 
 const STALE_AFTER_MS = 10 * 60 * 1000;
 
+/** A completed row with no risk level and an error is a soft failure (LLM
+ *  or comment step failed) rather than a successful review. Show it as failed. */
+function isSoftFailure(analysis: AnalysisCardData): boolean {
+  return (
+    analysis.status === 'completed' &&
+    !analysis.risk_level &&
+    Boolean(analysis.error_message)
+  );
+}
+
 export type AnalysisCardData = {
   id: string;
   summary: string | null;
@@ -44,7 +54,8 @@ export type AnalysisCardData = {
 
 export function AnalysisCard({ analysis }: { analysis: AnalysisCardData }): React.ReactElement {
   const summary = analysis.summary ?? '';
-  const riskLabel = analysis.risk_level ? analysis.risk_level : 'unknown';
+  const softFailed = isSoftFailure(analysis);
+  const riskLabel = analysis.risk_level ? analysis.risk_level : softFailed ? 'N/A' : 'unknown';
   const riskBadgeClass =
     (analysis.risk_level && RISK_BADGE[analysis.risk_level]) ?? 'text-muted bg-surface-raised';
   const stripColor = analysis.risk_level ? RISK_STRIP[analysis.risk_level] : null;
@@ -54,7 +65,7 @@ export function AnalysisCard({ analysis }: { analysis: AnalysisCardData }): Reac
     (analysis.status === 'running' || analysis.status === 'queued') &&
     !analysis.completed_at &&
     now - created.getTime() > STALE_AFTER_MS;
-  const failed = analysis.status === 'failed' || stale;
+  const failed = analysis.status === 'failed' || stale || softFailed;
   const status = failed
     ? FAILED_BADGE
     : analysis.status

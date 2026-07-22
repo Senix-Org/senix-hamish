@@ -32,12 +32,16 @@ export async function captureServerEvent(input: {
     // ids (the "user-1" person with GitHub-runner geolocations, 2026-07-18).
     if (process.env.NODE_ENV === 'test') return;
 
-    const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+    // NEXT_PUBLIC_* is inlined at build time for the Next.js bundle. The
+    // fallback POSTHOG_KEY covers the wrangler-bundled Worker entry and any
+    // runtime secret configuration where the public build-time value is not
+    // available.
+    const key = process.env.NEXT_PUBLIC_POSTHOG_KEY || process.env.POSTHOG_KEY;
     // No key (unset) or no identified user → skip. Every server event must
     // attach to the internal user UUID from Phase 3, never an anonymous id.
     if (!key || !input.distinctId) return;
 
-    const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com';
+    const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || process.env.POSTHOG_HOST || 'https://us.i.posthog.com';
 
     // Drop undefined-valued properties so they do not clutter the event.
     const properties = input.properties

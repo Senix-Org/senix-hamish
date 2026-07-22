@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, CreditCard, Loader2, Sparkles, X, Zap } from 'lucide-react';
+import { Check, Coins, CreditCard, Loader2, Sparkles, X, Zap } from 'lucide-react';
 import { DashboardPageHeader } from '@features/dashboard/components/page-header';
 import { WhopCheckoutDialog } from '@/components/whop-checkout-dialog';
+import { formatCredits, type CreditBalance, type CreditPackName, CREDIT_PACK_DETAILS } from '@features/billing/credit-packs';
 
 const BILLING_PERIOD_KEY = 'senix-billing-period';
 
@@ -36,6 +37,7 @@ export type BillingPlanData = {
 type Props = {
   planData: BillingPlanData;
   tiers: BillingTier[];
+  creditBalance: CreditBalance;
 };
 
 const PLAN_ORDER: BillingPlanName[] = ['free', 'starter', 'team', 'pro'];
@@ -64,9 +66,10 @@ const PLAN_PRICING: Record<BillingPlanName, {
  * side-by-side plan comparison. Analytics charts deliberately live
  * elsewhere — this page is for understanding the plan and upgrading fast.
  */
-export function BillingClient({ planData, tiers }: Props): React.ReactElement {
+export function BillingClient({ planData, tiers, creditBalance }: Props): React.ReactElement {
   const [currentPlanData, setCurrentPlanData] = useState(planData);
   const [checkoutBusy, setCheckoutBusy] = useState<BillingPlanName | null>(null);
+  const [creditPackBusy, setCreditPackBusy] = useState<CreditPackName | null>(null);
   const [cancelBusy, setCancelBusy] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -125,6 +128,12 @@ export function BillingClient({ planData, tiers }: Props): React.ReactElement {
     // Opens the embedded Whop checkout for this plan. The session is created
     // server-side (tied to the signed-in user) inside the dialog.
     setCheckoutBusy(plan);
+  }
+
+  function startCreditPackCheckout(pack: CreditPackName): void {
+    setMessage(null);
+    setError(null);
+    setCreditPackBusy(pack);
   }
 
   async function cancelSubscription(): Promise<void> {
@@ -187,7 +196,7 @@ export function BillingClient({ planData, tiers }: Props): React.ReactElement {
             <button
               type="button"
               onClick={() => startCheckout(nextTier.plan)}
-              disabled={checkoutBusy !== null}
+              disabled={checkoutBusy !== null || creditPackBusy !== null}
               className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:cursor-wait disabled:opacity-60"
             >
               {checkoutBusy === nextTier.plan ? (
@@ -232,6 +241,48 @@ export function BillingClient({ planData, tiers }: Props): React.ReactElement {
         )}
       </section>
 
+      {/* Credit packs */}
+      <section className="mt-8 rounded-xl border border-surface-border bg-surface p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-primary">Credit packs</h2>
+          <span className="rounded-full bg-surface-raised px-2 py-0.5 text-xs text-secondary">one-time top-up</span>
+        </div>
+        <p className="mb-5 text-sm text-secondary">
+          Add tokens that roll over month to month and expire 12 months after purchase. Plan tokens are always used first.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {(['small', 'large'] as CreditPackName[]).map((pack) => (
+            <div
+              key={pack}
+              className="flex flex-col justify-between gap-4 rounded-xl border border-surface-border bg-surface-raised p-4 sm:flex-row sm:items-center"
+            >
+              <div>
+                <p className="font-semibold text-primary">{CREDIT_PACK_DETAILS[pack].label}</p>
+                <p className="text-sm text-secondary">{formatCredits(CREDIT_PACK_DETAILS[pack].credits)} tokens</p>
+                <p className="text-sm font-medium text-primary">${CREDIT_PACK_DETAILS[pack].price}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => startCreditPackCheckout(pack)}
+                disabled={checkoutBusy !== null || creditPackBusy !== null}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-surface-border bg-surface px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-surface-raised disabled:cursor-wait disabled:opacity-60"
+                data-testid={`buy-credits-${pack}-button`}
+              >
+                {creditPackBusy === pack ? <Loader2 size={15} className="animate-spin" /> : <Coins size={15} />}
+                Buy credits
+              </button>
+            </div>
+          ))}
+        </div>
+        {creditBalance.packs.length > 0 && (
+          <p className="mt-4 text-sm text-secondary">
+            Current pack balance:{' '}
+            <span className="font-medium text-primary">{formatCredits(creditBalance.totalCredits)}</span> available across{' '}
+            {creditBalance.packs.length} pack{creditBalance.packs.length === 1 ? '' : 's'}
+          </p>
+        )}
+      </section>
+
       {/* Usage overview */}
       <section className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <StatCard
@@ -267,7 +318,7 @@ export function BillingClient({ planData, tiers }: Props): React.ReactElement {
               period={period}
               currentPlan={currentPlanData.plan}
               busy={checkoutBusy === tier.plan}
-              disabled={checkoutBusy !== null}
+              disabled={checkoutBusy !== null || creditPackBusy !== null}
               onUpgrade={() => startCheckout(tier.plan)}
             />
           ))}
@@ -288,10 +339,20 @@ export function BillingClient({ planData, tiers }: Props): React.ReactElement {
 
       {checkoutBusy && checkoutBusy !== 'free' && (
         <WhopCheckoutDialog
+          kind="plan"
           plan={checkoutBusy}
           period={period}
           loginRedirect="/dashboard/billing"
           onClose={() => setCheckoutBusy(null)}
+        />
+      )}
+
+      {creditPackBusy && (
+        <WhopCheckoutDialog
+          kind="credits"
+          pack={creditPackBusy}
+          loginRedirect="/dashboard/billing"
+          onClose={() => setCreditPackBusy(null)}
         />
       )}
 

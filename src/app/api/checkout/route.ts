@@ -15,6 +15,7 @@ type CheckoutResponse = {
   sessionId: string;
   planId: string | null;
   purchaseUrl: string;
+  affiliateCode: string | null;
 };
 
 function parsePeriod(body: unknown): BillingPeriod {
@@ -111,6 +112,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     metadata = { user_id: appUser.id, plan, period };
   }
 
+  // Read the YouTube affiliate cookie set by /yt/{code}. If the code is valid
+  // and active, pass it to the Whop embed so Whop can attribute the sale
+  // natively. We also stamp it into the checkout metadata for the webhook.
+  const senixRef = req.cookies.get('senix_ref')?.value;
+  let affiliateCode: string | null = null;
+  if (senixRef) {
+    const { data: affiliate } = await supabaseAdmin
+      .from('affiliates')
+      .select('id')
+      .eq('code', senixRef)
+      .eq('active', true)
+      .maybeSingle();
+    if (affiliate) {
+      affiliateCode = senixRef;
+      metadata.affiliate_code = affiliateCode;
+    }
+  }
+
   try {
     const config = await whopsdk.checkoutConfigurations.create({
       plan_id: planId,
@@ -123,6 +142,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       sessionId: config.id,
       planId: config.plan?.id ?? planId,
       purchaseUrl: config.purchase_url,
+      affiliateCode,
     };
     return NextResponse.json(payload);
   } catch (err) {

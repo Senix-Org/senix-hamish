@@ -509,6 +509,87 @@ affiliates.ts is reachable from the whop route only, not worker.ts).
    Both are display/data-integrity issues, not blockers; investigate with a
    clear head, do not fix tonight.
 
+## Dashboard, PostHog, and affiliate checkout fixes (2026-07-22)
+
+Picked up the three issues the user raised: unfinished dashboard, PostHog not
+working, and YouTube affiliate links not forwarding through Whop.
+
+1. POSTHOG FIX: root cause was that Next.js 16 + opennextjs/cloudflare does not
+   auto-load src/instrumentation-client.ts. Added
+   `instrumentationClientInject: ['./src/instrumentation-client.ts']` to
+   next.config.ts, and suppressed the resulting TS2353 by casting the config as
+   NextConfig. Also hardened posthog-identify.tsx to guard `posthog.__loaded`
+   before calling identify(), and added a runtime fallback in
+   features/shared/posthog-server.ts for POSTHOG_KEY / POSTHOG_HOST so the
+   wrangler-bundled Worker entry can still emit server-side events. These changes
+   were already on disk from the previous session; the only new delta was the
+   next.config.ts cast.
+
+2. DASHBOARD CREDIT PACKS UI (Phase 2b): finished the billing page.
+   src/app/dashboard/billing/billing-client.tsx now renders a Credit packs
+   section with Small ($10, 200k tokens) and Large ($25, 600k tokens) buy cards,
+   current pack balance display, and busy-state handling shared with plan
+   upgrades. It wires credit pack purchases into WhopCheckoutDialog with a new
+   `kind="credits"` branch.
+
+3. AFFILIATE CODE FORWARDING: updated src/app/api/checkout/route.ts to read the
+   `senix_ref` cookie, validate it against the active `affiliates` table, and
+   return `affiliateCode` in the checkout response while also stamping
+   `affiliate_code` into checkout metadata. Updated
+   src/components/whop-checkout-dialog.tsx to accept both plan and credit-pack
+   checkout modes and to pass the affiliateCode into WhopCheckoutEmbed so Whop
+   attributes the sale natively. Updated src/app/pricing/pricing-checkout-button.tsx
+   to pass `kind="plan"` to the dialog.
+
+4. TESTS: added features/billing/__tests__/checkout-route.test.ts covering plan
+   checkout, credit pack checkout, valid affiliate cookie forwarding, invalid
+   cookie rejection, and error cases. Full suite: 165 tests pass; tsc --noEmit
+   clean.
+
+OPEN:
+1. Deploy to Cloudflare via GitHub Actions; the OpenNext build cannot be
+   verified locally on Windows.
+2. Verify in PostHog Activity that $pageview fires on load and navigation, and
+   that a test purchase through a /yt/{code} link passes the affiliate code to
+   Whop.
+
+## Token reservation leak fix + dashboard display bug fixes (2026-07-22)
+
+Completed the two backlog items from 2026-07-18.
+
+1. TOKEN RESERVATION LEAK: added `finalizeAnalysisAsTerminal` helper in
+   features/review-queue/workflow/steps.ts. It performs a guarded status update
+   `.in('status', ['queued','running'])` plus `.select()` to detect whether this
+   call won the transition, then refunds the full `ESTIMATED_TOKENS_PER_REVIEW`
+   gate reservation via `recordTokenUsage(userId, 0, source, estimate)` exactly
+   once per analysis. Wired into:
+   - analyze-pr-workflow.ts catch block (Workflow step-retry exhaustion),
+   - worker/analyze-pr.ts catch/finally (legacy after() / Redis fallback paths),
+   - steps.ts preflight skip paths for uninstalled installation and
+     over-repo-limit (status 'completed' so they do not show as failed),
+   - check-stranded-analyses watchdog (now also joins through
+     pull_requests -> repositories -> installations to get installed_by_user_id).
+   New tests in features/review-queue/__tests__/finalize-analysis-terminal.test.ts
+   cover refund-on-transition, no-refund-when-already-terminal, no-refund-when-no-user,
+   survival of refund RPC failure, and source threading. 175 tests pass total;
+   tsc --noEmit clean.
+
+2. DASHBOARD DUPLICATE ROWS: `src/app/dashboard/reviews/page.tsx` now selects
+   `pull_request_id` and dedupes to the latest `created_at` analysis per PR
+   before rendering. New test in features/dashboard/__tests__/reviews-page.test.ts
+   mocks the server Supabase client and asserts the deduplication.
+
+3. "UNKNOWN" RISK BADGE: `features/dashboard/components/analysis-card.tsx` now
+   treats `status === 'completed' && !risk_level && error_message` as a soft
+   failure, rendering "Review Failed" status badge, the error message, and risk
+   label "N/A". `src/app/dashboard/analysis/[id]/page.tsx` applies the same
+   condition so the detail page status pill shows failed instead of completed.
+   New test in features/dashboard/__tests__/analysis-card.test.ts` verifies
+   badges and soft-failure copy.
+
+CLOSED: backlog items TOKEN RESERVATION LEAK and DASHBOARD DISPLAY BUGS. Still
+open: deploy and verify (see OPEN above), and apply migration 017 to prod.
+
 ## Backlog — scalability
 
 1. PR-path diff-size cap: the GitHub PR analysis path still has NO input-size

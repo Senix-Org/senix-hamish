@@ -23,7 +23,7 @@ const updates: Array<{ table: string; payload: Record<string, unknown> }> = [];
 
 function makeQuery(table: string) {
   const obj: Record<string, unknown> = {};
-  for (const m of ['select', 'eq', 'not', 'order', 'limit', 'is']) obj[m] = () => obj;
+  for (const m of ['select', 'eq', 'not', 'order', 'limit', 'is', 'in']) obj[m] = () => obj;
   obj.update = (payload: Record<string, unknown>) => {
     updates.push({ table, payload });
     return obj;

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { currentAppUserId } from '@features/auth/mcp-tokens';
 import { getUserPlan, PLAN_LIMITS } from '@features/billing/plan-limits';
+import { getCreditBalance, type CreditBalance } from '@features/billing/credit-packs';
 import { supabaseAdmin } from '@features/shared/supabase';
 import { BillingClient, type BillingPlanData, type BillingTier } from './billing-client';
 
@@ -57,13 +58,14 @@ export default async function BillingPage(): Promise<React.ReactElement> {
     redirect('/login?next=/dashboard/billing');
   }
 
-  const [userPlan, billingUserResult] = await Promise.all([
+  const [userPlan, billingUserResult, creditBalance] = await Promise.all([
     getUserPlan(userId),
     supabaseAdmin
       .from('users')
       .select('plan_expires_at, whop_membership_id')
       .eq('id', userId)
       .maybeSingle() as unknown as Promise<{ data: BillingUserRow | null }>,
+    getCreditBalance(userId),
   ]);
 
   const planData: BillingPlanData = {
@@ -79,5 +81,5 @@ export default async function BillingPage(): Promise<React.ReactElement> {
     tokensResetAt: userPlan.tokensResetAt,
   };
 
-  return <BillingClient planData={planData} tiers={TIERS} />;
+  return <BillingClient planData={planData} tiers={TIERS} creditBalance={creditBalance} />;
 }

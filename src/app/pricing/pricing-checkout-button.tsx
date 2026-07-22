@@ -47,6 +47,7 @@ export function PricingCheckoutButton({
       </button>
       {open && (
         <WhopCheckoutDialog
+          kind="plan"
           plan={plan as PaidPlan}
           period={period}
           loginRedirect="/pricing"

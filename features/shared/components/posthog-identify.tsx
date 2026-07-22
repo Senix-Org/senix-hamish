@@ -29,9 +29,10 @@ export default function PostHogIdentify({
 }): null {
   useEffect(() => {
     if (!distinctId) return;
-    // Skip if posthog is not initialized (no key at build time) or the user
-    // is already identified as this distinct id.
-    if (typeof posthog.get_distinct_id !== 'function') return;
+    // posthog.__loaded is set after init completes. Without this guard,
+    // identify() can run against an uninitialized library and do nothing.
+    if (!(posthog as unknown as { __loaded?: boolean }).__loaded) return;
+    // Skip if the user is already identified as this distinct id.
     if (posthog.get_distinct_id() === distinctId) return;
 
     posthog.identify(distinctId, {

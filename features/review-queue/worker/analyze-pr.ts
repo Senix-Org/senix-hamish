@@ -8,6 +8,7 @@ import {
   postAnalysisComment,
   finalizeAnalysis,
   trueUpTokenUsage,
+  finalizeAnalysisAsTerminal,
 } from '@features/review-queue/workflow/steps';
 import type { CommentOutcome } from '@features/review-queue/workflow/steps';
 import { captureServerEvent } from '@features/shared/posthog-server';
@@ -42,14 +43,8 @@ export async function processAnalyzePr(
     await finalizeAnalysis(payload, diff, llm, comment);
     await trueUpTokenUsage(payload, llm);
   } catch (err: any) {
-    await supabaseAdmin
-      .from('analyses')
-      .update({
-        status: 'failed',
-        completed_at: new Date().toISOString(),
-        error_message: err?.message ?? String(err),
-      })
-      .eq('id', analysisId);
+    const message = err?.message ?? String(err);
+    await finalizeAnalysisAsTerminal(analysisId, payload.userId, 'failed', message);
     // Release the Redis ownership claim immediately so a requeue can be
     // picked up right away instead of waiting out the claim TTL (1 hour).
     // Best-effort: a release failure must not mask the original error.
@@ -61,32 +56,21 @@ export async function processAnalyzePr(
     await captureServerEvent({
       distinctId: payload.userId,
       event: 'pr_review_failed',
-      properties: { repo: `${payload.owner}/${payload.repo}`, reason: err?.message ?? String(err) },
+      properties: { repo: `${payload.owner}/${payload.repo}`, reason: message },
     });
     throw err;
   } finally {
     // Safety net: if the row somehow slipped through still marked 'running'
     // (e.g. the completed/failed update above itself failed, or the function
-    // was killed between writes), mark it failed so it never stays stuck on
-    // a spinner forever.
-    const { data: finalRow } = await supabaseAdmin
-      .from('analyses')
-      .select('status')
-      .eq('id', analysisId)
-      .maybeSingle();
-    const current = (finalRow ?? null) as unknown as { status: string | null } | null;
-
-    if (current?.status === 'running') {
-      await supabaseAdmin
-        .from('analyses')
-        .update({
-          status: 'failed',
-          completed_at: new Date().toISOString(),
-          error_message: 'Analysis did not complete',
-        })
-        .eq('id', analysisId);
-      // This is a failure path too: clear the claim so a requeue is not
-      // blocked until the TTL expires. Best-effort, same as the catch above.
+    // was killed between writes), mark it failed and refund the reservation so
+    // it never stays stuck on a spinner forever nor leaks tokens.
+    const finality = await finalizeAnalysisAsTerminal(
+      analysisId,
+      payload.userId,
+      'failed',
+      'Analysis did not complete'
+    );
+    if (finality === 'finalized-and-refunded') {
       try {
         await releaseAnalysisClaim(analysisId);
       } catch (releaseErr) {

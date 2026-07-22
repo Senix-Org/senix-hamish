@@ -110,7 +110,9 @@ export default async function AnalysisDetailPage({
     data.status === 'running' &&
     !data.completed_at &&
     nowMs - new Date(data.created_at).getTime() > 10 * 60 * 1000;
-  const failed = data.status === 'failed' || stale;
+  const softFailed =
+    data.status === 'completed' && !data.risk_level && Boolean(data.error_message);
+  const failed = data.status === 'failed' || stale || softFailed;
   const riskTone =
     (data.risk_level && RISK_TONE[data.risk_level]) ??
     'text-muted bg-surface-raised border-surface-border';

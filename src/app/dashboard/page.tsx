@@ -24,6 +24,7 @@ import RepoToggle from '@features/dashboard/components/repo-toggle';
 import { getGithubAppInstallUrl } from '@features/github-integration/install-url';
 import { currentAppUserId } from '@features/auth/mcp-tokens';
 import { getUserPlan } from '@features/billing/plan-limits';
+import { getCreditBalance, type CreditBalance } from '@features/billing/credit-packs';
 
 const REPO_DOT_COLORS = ['#3ecf8e', '#76a7d6', '#e0a23a', '#c98bdb', '#f0616a', '#5fc9b8'];
 function repoDotColor(name: string): string {
@@ -89,11 +90,11 @@ export default async function DashboardPage({
   const analyses = (analysesResult.data ?? []) as unknown as AnalysisRow[];
   const repos = (reposResult.data ?? []) as unknown as RepoRow[];
 
-  let usage: { used: number; limit: number; percent: number; planLabel: string } | null = null;
+  let usage: { used: number; limit: number; percent: number; planLabel: string; creditBalance: CreditBalance | null } | null = null;
   try {
     const userId = await currentAppUserId();
     if (userId) {
-      const plan = await getUserPlan(userId);
+      const [plan, creditBalance] = await Promise.all([getUserPlan(userId), getCreditBalance(userId)]);
       const limit = plan.effectiveLimit.tokens;
       if (limit > 0) {
         usage = {
@@ -101,6 +102,7 @@ export default async function DashboardPage({
           limit,
           percent: Math.min(100, Math.round((plan.tokensUsed / limit) * 100)),
           planLabel: plan.effectiveLimit.label,
+          creditBalance,
         };
       }
     }
@@ -171,6 +173,7 @@ export default async function DashboardPage({
               used={usage.used}
               limit={usage.limit}
               planLabel={usage.planLabel}
+              creditBalance={usage.creditBalance}
             />
           </div>
         )}

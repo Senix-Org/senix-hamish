@@ -15,11 +15,20 @@ import posthog from 'posthog-js';
  */
 const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 
-if (posthogKey) {
+// instrumentation-client.ts runs in the browser before hydration. Guard
+// against non-browser contexts (e.g. test environments or unexpected Node
+// execution) and skip silently when no key is configured.
+if (typeof window !== 'undefined' && posthogKey) {
   posthog.init(posthogKey, {
     api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com',
     autocapture: true,
     capture_pageview: 'history_change',
     capture_pageleave: true,
+    // Ensure the distinct id is persisted across sessions; this also makes
+    // PostHogIdentify's get_distinct_id guard reliable after init.
+    persistence: 'localStorage+cookie',
   });
+} else if (typeof window !== 'undefined' && !posthogKey && process.env.NODE_ENV === 'development') {
+  // eslint-disable-next-line no-console
+  console.warn('[posthog] NEXT_PUBLIC_POSTHOG_KEY is not set; client analytics are disabled.');
 }

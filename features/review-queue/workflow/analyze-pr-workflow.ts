@@ -8,6 +8,7 @@ import {
   postAnalysisComment,
   finalizeAnalysis,
   trueUpTokenUsage,
+  finalizeAnalysisAsTerminal,
 } from '@features/review-queue/workflow/steps';
 import type { AnalyzeJob, CommentOutcome } from '@features/review-queue/workflow/steps';
 import { captureServerEvent } from '@features/shared/posthog-server';
@@ -71,22 +72,14 @@ export async function runAnalyzePipeline(
 
     await step.do('true-up-token-usage', STEP_RETRIES, () => trueUpTokenUsage(job, llm));
   } catch (err) {
-    // A step exhausted its retries. Record the terminal failure and free
-    // the ownership claim so a manual requeue is not blocked, then rethrow
-    // so the Workflow instance itself reports as failed.
+    // A step exhausted its retries. Record the terminal failure, refund the
+    // gate reservation, and free the ownership claim so a manual requeue is
+    // not blocked, then rethrow so the Workflow instance itself reports as
+    // failed. The refund is guarded by the same non-terminal status check, so
+    // a concurrent success never gets its reservation clawed back.
     const message = err instanceof Error ? err.message : String(err);
     await step.do('mark-analysis-failed', STEP_RETRIES, async () => {
-      await supabaseAdmin
-        .from('analyses')
-        .update({
-          status: 'failed',
-          completed_at: new Date().toISOString(),
-          error_message: message,
-        })
-        .eq('id', job.analysisId)
-        // Only overwrite non-terminal states: a concurrent finalize that
-        // actually landed must not be clobbered by the failure path.
-        .in('status', ['queued', 'running']);
+      await finalizeAnalysisAsTerminal(job.analysisId, job.userId, 'failed', message);
       try {
         await releaseAnalysisClaim(job.analysisId);
       } catch (releaseErr) {

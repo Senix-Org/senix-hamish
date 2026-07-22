@@ -9,7 +9,12 @@ import { upsertPRComment } from '@features/github-integration/github-comments';
 import type { JobPayloadMap } from '@features/review-queue/queue';
 import { claimAnalysis } from '@features/review-queue/queue';
 import { getAppBaseUrl } from '@features/shared/mcp-config';
-import { isOverRepoLimit, recordTokenUsage, ESTIMATED_TOKENS_PER_REVIEW } from '@features/billing/plan-limits';
+import {
+  isOverRepoLimit,
+  recordTokenUsage,
+  ESTIMATED_TOKENS_PER_REVIEW,
+  type TokenSource,
+} from '@features/billing/plan-limits';
 import { captureServerEvent } from '@features/shared/posthog-server';
 
 /**
@@ -59,6 +64,54 @@ export type CommentOutcome = {
   postError: string | null;
 };
 
+export type TerminalFinality =
+  | 'finalized-and-refunded'
+  | 'already-terminal'
+  | 'no-user';
+
+/**
+ * Mark a non-terminal analysis as skipped or failed and refund the token
+ * reservation that was debited at the gate. The guarded update only wins
+ * once (status must still be 'queued' or 'running'), so the refund runs at
+ * most once per analysis even when the Workflow failure path, the sequential
+ * runner's catch/finally, and the watchdog race each other. Already-terminal
+ * rows are left untouched and receive no refund — a successful completion
+ * must not have its reservation clawed back.
+ */
+export async function finalizeAnalysisAsTerminal(
+  analysisId: string,
+  userId: string | null,
+  terminalStatus: 'completed' | 'failed',
+  errorMessage: string,
+  source: TokenSource = 'pr'
+): Promise<TerminalFinality> {
+  if (!userId) return 'no-user';
+
+  const { data } = (await supabaseAdmin
+    .from('analyses')
+    .update({
+      status: terminalStatus,
+      completed_at: new Date().toISOString(),
+      error_message: errorMessage,
+    })
+    .eq('id', analysisId)
+    .in('status', ['queued', 'running'])
+    .select('id')
+    .maybeSingle()) as unknown as { data: { id: string } | null };
+
+  if (!data) return 'already-terminal';
+
+  try {
+    await recordTokenUsage(userId, 0, source, ESTIMATED_TOKENS_PER_REVIEW);
+  } catch (usageErr) {
+    console.error(
+      `[analyze-pr] ${analysisId}: failed to refund token reservation`,
+      usageErr
+    );
+  }
+  return 'finalized-and-refunded';
+}
+
 /**
  * Step 1 — claim ownership and screen out work that must not run: an
  * uninstalled installation or an over-repo-cap account. Marks the analysis
@@ -88,14 +141,12 @@ export async function preflightAnalysis(job: AnalyzeJob): Promise<PreflightResul
     console.log(
       `[worker] skipping job — installation uninstalled (id=${installationId}, at=${installation.uninstalled_at})`
     );
-    await supabaseAdmin
-      .from('analyses')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        error_message: 'skipped: installation uninstalled',
-      })
-      .eq('id', analysisId);
+    await finalizeAnalysisAsTerminal(
+      analysisId,
+      userId,
+      'completed',
+      'skipped: installation uninstalled'
+    );
     return { proceed: false, skippedReason: 'installation uninstalled' };
   }
 
@@ -104,14 +155,12 @@ export async function preflightAnalysis(job: AnalyzeJob): Promise<PreflightResul
   if (userId && (await isOverRepoLimit(userId))) {
     console.log(`[worker] skipping job — user ${userId} is over their repo limit`);
     await postPlainComment({ pullRequestId, installationId, owner, repo, prNumber }, REPO_LIMIT_COMMENT);
-    await supabaseAdmin
-      .from('analyses')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        error_message: 'skipped: over repo limit',
-      })
-      .eq('id', analysisId);
+    await finalizeAnalysisAsTerminal(
+      analysisId,
+      userId,
+      'completed',
+      'skipped: over repo limit'
+    );
     return { proceed: false, skippedReason: 'over repo limit' };
   }
 

@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { supabaseAdmin } from '@features/shared/supabase';
 import { verifyInternalAuth, internalUnauthorized } from '@/lib/internal-auth';
 import { captureServerEvent } from '@features/shared/posthog-server';
+import { finalizeAnalysisAsTerminal } from '@features/review-queue/workflow/steps';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -89,34 +90,36 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       pullRequestId: row.pull_request_id,
     });
 
-    const { error: updateError } = await supabaseAdmin
-      .from('analyses')
-      .update({
-        status: 'failed',
-        completed_at: new Date().toISOString(),
-        error_message:
-          'Watchdog: analysis was stranded in a non-terminal state (likely cancelled by the Workers waitUntil ~30s limit) and never completed.',
-      })
-      .eq('id', row.id)
-      // Guard against racing a slow-but-alive analysis that finishes between
-      // our select and this update: only overwrite non-terminal statuses.
-      .in('status', ['queued', 'running']);
+    const repo = row.pull_requests?.repositories ?? null;
+    const userId = repo?.installations?.installed_by_user_id ?? null;
+    const finality = await finalizeAnalysisAsTerminal(
+      row.id,
+      userId,
+      'failed',
+      'Watchdog: analysis was stranded in a non-terminal state (likely cancelled by the Workers waitUntil ~30s limit) and never completed.',
+      'pr'
+    );
 
-    if (updateError) {
-      console.error('[stranded-analysis watchdog] failed to mark row failed', {
-        analysisId: row.id,
-        message: updateError.message,
-      });
-    } else {
+    if (finality === 'finalized-and-refunded') {
       marked += 1;
-      const repo = row.pull_requests?.repositories ?? null;
       await captureServerEvent({
-        distinctId: repo?.installations?.installed_by_user_id,
+        distinctId: userId,
         event: 'pr_review_failed',
         properties: {
           repo: repo?.full_name ?? undefined,
           reason: 'stranded: never completed (watchdog swept to failed)',
         },
+      });
+    } else if (finality === 'already-terminal') {
+      // Another path (a late-finish success or a concurrent failure handler)
+      // already settled the row. Not a watchdog failure, but worth noting.
+      console.log('[stranded-analysis watchdog] row became terminal between scan and update', {
+        analysisId: row.id,
+      });
+    } else {
+      console.error('[stranded-analysis watchdog] failed to mark row failed', {
+        analysisId: row.id,
+        finality,
       });
     }
   }
