@@ -34,7 +34,7 @@ export function TraeStatsSection(): React.ReactElement {
         className="pointer-events-none absolute inset-x-0 top-0 h-full"
         style={{
           background:
-            'radial-gradient(ellipse 70% 80% at 50% 0%, rgba(50,240,140,0.07) 0%, transparent 65%)',
+            'radial-gradient(ellipse 70% 80% at 50% 0%, rgba(50, 240, 140,0.07) 0%, transparent 65%)',
         }}
       />
 
@@ -42,7 +42,7 @@ export function TraeStatsSection(): React.ReactElement {
         {/* Header label */}
         <div data-trae-item className="opacity-0 text-center mb-12 md:mb-16">
           <p className="trae-section-label">By the numbers</p>
-          <p className="mt-3 text-[#f5f9fe] text-lg font-medium">
+          <p className="mt-3 text-[#ffffff] text-lg font-medium">
             The fastest AI code review for teams shipping with AI assistants.
           </p>
         </div>
@@ -60,7 +60,7 @@ export function TraeStatsSection(): React.ReactElement {
           {STATS.map((stat) => (
             <div
               key={stat.label}
-              className="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center"
+              className="flex flex-col items-center justify-center gap-2 px-3 py-8 text-center sm:px-6 sm:py-10"
               style={{ background: 'var(--trae-bg)' }}
             >
               <div className="trae-gradient-text trae-leader-stat-number tabular-nums">
@@ -72,7 +72,7 @@ export function TraeStatsSection(): React.ReactElement {
                   duration={1.4}
                 />
               </div>
-              <p className="text-sm text-[#787d87]">{stat.label}</p>
+              <p className="text-sm text-[#8b8794]">{stat.label}</p>
             </div>
           ))}
         </div>
@@ -84,8 +84,8 @@ export function TraeStatsSection(): React.ReactElement {
         <div data-trae-item className="opacity-0">
           <div className="flex flex-col items-center gap-6 text-center lg:flex-row lg:text-left lg:gap-10">
             <div className="lg:w-64 shrink-0">
-              <p className="text-sm font-medium text-[#f5f9fe]">Works where you ship</p>
-              <p className="mt-2 text-sm text-[#a6aab5]">
+              <p className="text-sm font-medium text-[#ffffff]">Works where you ship</p>
+              <p className="mt-2 text-sm text-[#c9c5d2]">
                 Connect GitHub once. Get reviews in the PR, in Cursor via MCP, or from any IDE.
               </p>
             </div>
@@ -96,7 +96,7 @@ export function TraeStatsSection(): React.ReactElement {
                 return (
                   <span
                     key={name}
-                    className="trae-card-gradient-border inline-flex items-center gap-2 rounded border border-white/[0.10] bg-[#0d0e10] px-5 py-2.5 text-sm text-[#a6aab5] transition hover:border-[#32f08c]/30 hover:text-[#f5f9fe]"
+                    className="trae-card-gradient-border inline-flex items-center gap-2 rounded border border-white/[0.10] bg-[#0d0e10] px-5 py-2.5 text-sm text-[#c9c5d2] transition hover:border-[#32f08c]/30 hover:text-[#ffffff]"
                   >
                     {icon && (
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={15} height={15} fill={icon.fill} className="shrink-0 opacity-80" aria-hidden="true">

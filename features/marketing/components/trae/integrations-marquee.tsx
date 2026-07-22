@@ -88,7 +88,7 @@ const TOOLS = [
 
 function ToolPill({ name }: { name: string }): React.ReactElement {
   return (
-    <span className="trae-integration-pill inline-flex shrink-0 items-center gap-2 rounded border border-white/[0.1] bg-[#121314] px-4 py-2 font-mono text-xs text-[#a6aab5]">
+    <span className="trae-integration-pill inline-flex shrink-0 items-center gap-2 rounded border border-white/[0.1] bg-[#121314] px-4 py-2 font-mono text-xs text-[#c9c5d2]">
       <ToolIcon name={name} />
       {name}
     </span>

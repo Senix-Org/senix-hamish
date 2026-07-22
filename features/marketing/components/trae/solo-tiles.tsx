@@ -84,10 +84,10 @@ export function TraeSoloTiles({ className = '' }: { className?: string }): React
             backgroundSize: '12px 12px',
           }}
         >
-          <span className="font-mono text-[13px] font-medium text-[#f5f9fe]">{label}</span>
+          <span className="font-mono text-[13px] font-medium text-[#ffffff]">{label}</span>
           <div>
             <span className="trae-gradient-text block font-mono text-[13px] font-medium">{accent}</span>
-            <span className="mt-1 block text-[10px] text-[#787d87] transition group-hover:text-[#a6aab5]">
+            <span className="mt-1 block text-[10px] text-[#8b8794] transition group-hover:text-[#c9c5d2]">
               {desc}
             </span>
           </div>

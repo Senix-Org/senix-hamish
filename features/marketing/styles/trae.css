@@ -1,28 +1,35 @@
-/* TRAE.ai design tokens — https://www.trae.ai/ */
+/* Senix marketing tokens — CodeRabbit-inspired layout with Senix green */
 .trae-site {
-  --trae-bg: #0a0b0d;
-  --trae-bg-secondary: #121314;
+  --trae-bg: #09080c;
+  --trae-bg-deep: #050409;
+  --trae-bg-secondary: #0f0d14;
+  --trae-bg-elevated: #16131d;
   --trae-brand: #32f08c;
   --trae-brand-hover: #0fdc78;
+  --trae-brand-press: #0bc96a;
+  --trae-brand-soft: rgba(50, 240, 140, 0.16);
   --trae-brand-gradient: linear-gradient(
     90deg,
     #3ee1a3 0%,
-    #32f08c 36%,
-    #60f2bd 71.63%,
-    #a0fde7 100%
+    #32f08c 42%,
+    #0fdc78 72%,
+    #60f2bd 100%
   );
-  --trae-text: #f5f9fe;
-  --trae-text-secondary: #a6aab5;
-  --trae-text-tertiary: #787d87;
-  --trae-border: hsla(0, 0%, 100%, 0.18);
-  --trae-border-subtle: hsla(0, 0%, 100%, 0.12);
-  --trae-overlay: rgba(237, 239, 242, 0.08);
+  --trae-cta: #ffffff;
+  --trae-cta-hover: #ededed;
+  --trae-cta-text: #000000;
+  --trae-text: #ffffff;
+  --trae-text-secondary: #c9c5d2;
+  --trae-text-tertiary: #8b8794;
+  --trae-border: #262433;
+  --trae-border-subtle: rgba(255, 255, 255, 0.06);
+  --trae-overlay: rgba(255, 255, 255, 0.06);
   --trae-header-height: 64px;
-  --trae-max-width: 1600px;
+  --trae-max-width: 1200px;
 
   background: var(--trae-bg);
   color: var(--trae-text);
-  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
   position: relative;
 }
 
@@ -79,10 +86,10 @@
 
 .trae-section-title {
   margin-top: 12px;
-  font-size: clamp(28px, 4vw, 42px);
-  font-weight: 500;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+  font-size: clamp(32px, 4.5vw, 48px);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
   color: var(--trae-text);
 }
 
@@ -99,7 +106,7 @@
   --beam-opacity: 0;
   position: relative;
   border: 1px solid var(--trae-border-subtle);
-  border-radius: 2px;
+  border-radius: 12px;
   background: var(--trae-bg-secondary);
   transition:
     border-color 0.25s,
@@ -215,50 +222,117 @@
   align-items: center;
   justify-content: center;
   min-width: 96px;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: 8px;
+  font-size: 15px;
   font-weight: 500;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   transition:
     background 0.15s,
     border-color 0.15s,
-    transform 0.15s;
+    box-shadow 0.15s,
+    transform 0.15s,
+    filter 0.15s,
+    color 0.15s;
 }
 
+/* Primary CTA: white fill / black text (CodeRabbit pattern) */
 .trae-btn-brand {
-  background: var(--trae-brand);
-  color: #0a0b0d;
+  background: var(--trae-cta);
+  color: var(--trae-cta-text);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
 }
 
 .trae-btn-brand:hover {
-  background: var(--trae-brand-hover);
+  background: var(--trae-cta-hover);
+  color: var(--trae-cta-text);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  transform: translateY(-1px);
+}
+
+.trae-btn-brand:active {
+  transform: translateY(0);
+  filter: brightness(0.96);
 }
 
 .trae-btn-outline {
-  border: 1px solid #fff;
-  color: #f5f9fe;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
   background: transparent;
+  box-shadow: none;
 }
 
 .trae-btn-outline:hover {
   background: var(--trae-overlay);
-  color: #f5f9fe;
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* Compact nav CTAs: ghost Sign in + solid Get started / Dashboard */
+.trae-nav-ghost {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--trae-text-secondary);
+  background: transparent;
+  transition: color 0.15s, background 0.15s;
+}
+
+.trae-nav-ghost:hover {
+  color: var(--trae-text);
+  background: var(--trae-overlay);
+}
+
+.trae-nav-cta {
+  height: 36px;
+  min-width: 0;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--trae-cta-text);
+  background: var(--trae-cta);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition:
+    background 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s,
+    filter 0.15s;
+}
+
+.trae-nav-cta:hover {
+  background: var(--trae-cta-hover);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  transform: translateY(-1px);
+}
+
+.trae-nav-cta:active {
+  transform: translateY(0);
+  filter: brightness(0.96);
 }
 
 .trae-site a.trae-btn-outline,
 .trae-site .trae-btn-outline span {
-  color: #f5f9fe;
+  color: #ffffff;
 }
 
 .trae-footer-wordmark-wrap {
-  overflow: visible;
+  overflow: hidden;
   position: relative;
-  width: 100vw;
-  max-width: 100vw;
-  margin-left: calc(50% - 50vw);
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
   margin-top: 0;
   padding-bottom: 0;
-  min-height: clamp(140px, 19vw, 320px);
+  min-height: clamp(120px, 22vw, 280px);
   line-height: 1;
   user-select: none;
   pointer-events: none;
@@ -266,10 +340,10 @@
   /* CodeRabbit-style: dark gradient pool the letters sit in */
   background: linear-gradient(
     to bottom,
-    rgba(10, 11, 13, 0) 0%,
-    rgba(6, 7, 8, 0.6) 40%,
-    rgba(4, 5, 6, 0.92) 75%,
-    #030404 100%
+    rgba(9, 8, 12, 0) 0%,
+    rgba(5, 4, 9, 0.6) 40%,
+    rgba(5, 4, 9, 0.92) 75%,
+    #050409 100%
   );
 }
 
@@ -280,7 +354,7 @@
   inset-x: 0;
   top: 0;
   height: 35%;
-  background: linear-gradient(to bottom, rgba(10,11,13,0.55) 0%, transparent 100%);
+  background: linear-gradient(to bottom, rgba(9,8,12,0.55) 0%, transparent 100%);
   pointer-events: none;
   z-index: 2;
 }
@@ -292,7 +366,7 @@
   inset-x: 0;
   bottom: 0;
   height: 30%;
-  background: #030404;
+  background: #050409;
   pointer-events: none;
   z-index: 2;
 }
@@ -303,8 +377,8 @@
   align-items: center;
   width: 100%;
   margin: 0;
-  padding: 0 clamp(12px, 2vw, 24px);
-  font-size: clamp(88px, 18vw, 340px);
+  padding: 0 clamp(8px, 2vw, 24px);
+  font-size: clamp(72px, 22vw, 340px);
   font-weight: 500;
   letter-spacing: -0.028em;
   text-align: center;
@@ -488,7 +562,7 @@
 
 .trae-testimonial-card {
   position: relative;
-  border-radius: 2px;
+  border-radius: 12px;
   min-height: 196px;
   overflow: hidden;
 }
@@ -552,7 +626,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #0a0b0d;
+  color: #09080c;
   background: var(--trae-brand);
   padding: 2px 7px;
   border-radius: 9999px;
@@ -569,10 +643,17 @@
   display: flex;
   gap: 0;
   border-bottom: 1px solid var(--trae-border-subtle);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.trae-feature-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .trae-feature-tab {
-  padding: 10px 20px;
+  padding: 10px 16px;
   font-size: 13px;
   font-weight: 500;
   color: var(--trae-text-tertiary);
@@ -584,6 +665,13 @@
     color 0.2s,
     border-color 0.2s;
   white-space: nowrap;
+  flex-shrink: 0;
+}
+
+@media (min-width: 744px) {
+  .trae-feature-tab {
+    padding: 10px 20px;
+  }
 }
 
 .trae-feature-tab:hover {
@@ -798,6 +886,12 @@
 
   .trae-shimmer-btn::after {
     animation: none;
+  }
+
+  .trae-btn-brand:hover,
+  .trae-btn-outline:hover,
+  .trae-nav-cta:hover {
+    transform: none;
   }
 
   .trae-page-gradient {

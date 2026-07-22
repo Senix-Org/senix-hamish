@@ -138,10 +138,10 @@ export function TraeHeroBackground(): React.ReactElement {
         className="absolute inset-0"
         style={{
           background: [
-            'radial-gradient(ellipse 80% 55% at 50% -8%, rgba(50,240,140,0.16) 0%, transparent 65%)',
-            'radial-gradient(ellipse 45% 40% at 10% 30%, rgba(96,242,189,0.07) 0%, transparent 55%)',
-            'radial-gradient(ellipse 38% 35% at 88% 25%, rgba(50,240,140,0.05) 0%, transparent 55%)',
-            'radial-gradient(ellipse 70% 55% at 72% 78%, rgba(50,240,140,0.04) 0%, transparent 65%)',
+            'radial-gradient(ellipse 80% 55% at 50% -8%, rgba(50, 240, 140,0.16) 0%, transparent 65%)',
+            'radial-gradient(ellipse 45% 40% at 10% 30%, rgba(96, 242, 189,0.07) 0%, transparent 55%)',
+            'radial-gradient(ellipse 38% 35% at 88% 25%, rgba(50, 240, 140,0.05) 0%, transparent 55%)',
+            'radial-gradient(ellipse 70% 55% at 72% 78%, rgba(50, 240, 140,0.04) 0%, transparent 65%)',
           ].join(', '),
         }}
       />
@@ -151,7 +151,7 @@ export function TraeHeroBackground(): React.ReactElement {
         className="absolute inset-x-0 top-0 h-px"
         style={{
           background:
-            'linear-gradient(90deg, transparent 0%, rgba(50,240,140,0.35) 30%, rgba(160,253,231,0.3) 50%, rgba(50,240,140,0.35) 70%, transparent 100%)',
+            'linear-gradient(90deg, transparent 0%, rgba(50, 240, 140,0.35) 30%, rgba(160, 253, 231,0.3) 50%, rgba(50, 240, 140,0.35) 70%, transparent 100%)',
         }}
       />
 
@@ -160,7 +160,7 @@ export function TraeHeroBackground(): React.ReactElement {
         className="absolute -left-32 top-1/4 h-[400px] w-[400px] opacity-40"
         style={{
           background:
-            'radial-gradient(ellipse at center, rgba(50,240,140,0.12) 0%, transparent 70%)',
+            'radial-gradient(ellipse at center, rgba(50, 240, 140,0.12) 0%, transparent 70%)',
           filter: 'blur(40px)',
         }}
       />
@@ -170,7 +170,7 @@ export function TraeHeroBackground(): React.ReactElement {
         className="absolute -right-24 top-1/3 h-[300px] w-[350px] opacity-30"
         style={{
           background:
-            'radial-gradient(ellipse at center, rgba(96,242,189,0.1) 0%, transparent 70%)',
+            'radial-gradient(ellipse at center, rgba(96, 242, 189,0.1) 0%, transparent 70%)',
           filter: 'blur(40px)',
         }}
       />
@@ -178,7 +178,7 @@ export function TraeHeroBackground(): React.ReactElement {
       <div
         className="absolute inset-x-0 bottom-0 h-40"
         style={{
-          background: 'linear-gradient(to top, var(--trae-bg, #0a0b0d) 0%, transparent 100%)',
+          background: 'linear-gradient(to top, var(--trae-bg, #09080c) 0%, transparent 100%)',
         }}
       />
     </div>

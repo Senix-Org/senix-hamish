@@ -171,9 +171,9 @@ export function TraeDemoSection(): React.ReactElement {
     >
       {/* ── Brand-green ambient glow blobs ── */}
       <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 55% at 50% 8%, rgba(50,240,140,0.09) 0%, transparent 62%)' }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 45% 35% at 15% 60%, rgba(50,240,140,0.045) 0%, transparent 65%)' }} />
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 40% 30% at 85% 55%, rgba(96,242,189,0.035) 0%, transparent 65%)' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 55% at 50% 8%, rgba(50, 240, 140,0.09) 0%, transparent 62%)' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 45% 35% at 15% 60%, rgba(50, 240, 140,0.045) 0%, transparent 65%)' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 40% 30% at 85% 55%, rgba(96, 242, 189,0.035) 0%, transparent 65%)' }} />
         {/* Noise grain for solid, tactile feel */}
         <div style={{
           position: 'absolute', inset: 0, opacity: 0.018,
@@ -196,7 +196,7 @@ export function TraeDemoSection(): React.ReactElement {
               fontWeight: 500,
               lineHeight: 1.15,
               letterSpacing: '-0.02em',
-              color: '#f5f9fe',
+              color: '#ffffff',
               opacity: 0,
             }}
           >
@@ -241,7 +241,7 @@ export function TraeDemoSection(): React.ReactElement {
                 position: 'absolute',
                 inset: '-28px',
                 borderRadius: '24px',
-                background: 'radial-gradient(ellipse at center, rgba(50,240,140,0.18) 0%, rgba(50,240,140,0.04) 45%, transparent 70%)',
+                background: 'radial-gradient(ellipse at center, rgba(50, 240, 140,0.18) 0%, rgba(50, 240, 140,0.04) 45%, transparent 70%)',
                 filter: 'blur(12px)',
                 zIndex: -1,
               }} />
@@ -284,8 +284,8 @@ export function TraeDemoSection(): React.ReactElement {
                     alignItems: 'center',
                     gap: '7px',
                     padding: '11px 16px',
-                    borderBottom: '1px solid rgba(50,240,140,0.12)',
-                    background: 'linear-gradient(90deg, #0d0e10 0%, rgba(50,240,140,0.04) 50%, #0d0e10 100%)',
+                    borderBottom: '1px solid rgba(50, 240, 140,0.12)',
+                    background: 'linear-gradient(90deg, #0d0e10 0%, rgba(50, 240, 140,0.04) 50%, #0d0e10 100%)',
                   }}>
                     <span style={{ height: '10px', width: '10px', borderRadius: '50%', background: '#ff5f57', flexShrink: 0 }} aria-hidden />
                     <span style={{ height: '10px', width: '10px', borderRadius: '50%', background: '#febc2e', flexShrink: 0 }} aria-hidden />
@@ -293,14 +293,18 @@ export function TraeDemoSection(): React.ReactElement {
                     <span style={{
                       marginLeft: '12px',
                       flex: 1,
+                      minWidth: 0,
                       borderRadius: '4px',
-                      border: '1px solid rgba(50,240,140,0.08)',
-                      background: '#0a0b0d',
+                      border: '1px solid rgba(50, 240, 140,0.08)',
+                      background: '#09080c',
                       padding: '3px 12px',
                       textAlign: 'center',
                       fontFamily: 'monospace',
                       fontSize: '11px',
-                      color: '#787d87',
+                      color: '#8b8794',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
                     }}>
                       github.com / your-org / your-repo / pull / 247
                     </span>
@@ -326,7 +330,7 @@ export function TraeDemoSection(): React.ReactElement {
                         top: 0,
                         bottom: 0,
                         width: '28%',
-                        background: 'linear-gradient(108deg, transparent 0%, rgba(50,240,140,0.04) 30%, rgba(96,242,189,0.09) 50%, rgba(50,240,140,0.04) 70%, transparent 100%)',
+                        background: 'linear-gradient(108deg, transparent 0%, rgba(50, 240, 140,0.04) 30%, rgba(96, 242, 189,0.09) 50%, rgba(50, 240, 140,0.04) 70%, transparent 100%)',
                         pointerEvents: 'none',
                       }}
                     />
@@ -338,7 +342,7 @@ export function TraeDemoSection(): React.ReactElement {
                       left: '10%',
                       right: '10%',
                       height: '1px',
-                      background: 'linear-gradient(90deg, transparent, rgba(50,240,140,0.4) 40%, rgba(160,253,231,0.55) 50%, rgba(50,240,140,0.4) 60%, transparent)',
+                      background: 'linear-gradient(90deg, transparent, rgba(50, 240, 140,0.4) 40%, rgba(160, 253, 231,0.55) 50%, rgba(50, 240, 140,0.4) 60%, transparent)',
                     }} />
 
                     {/* Play overlay */}
@@ -363,10 +367,10 @@ export function TraeDemoSection(): React.ReactElement {
                           alignItems: 'center',
                           justifyContent: 'center',
                           borderRadius: '50%',
-                          border: '1px solid rgba(50,240,140,0.5)',
-                          background: 'rgba(50,240,140,0.1)',
+                          border: '1px solid rgba(50, 240, 140,0.5)',
+                          background: 'rgba(50, 240, 140,0.1)',
                           backdropFilter: 'blur(8px)',
-                          boxShadow: '0 0 48px -8px rgba(50,240,140,0.45), inset 0 1px 0 rgba(96,242,189,0.2)',
+                          boxShadow: '0 0 48px -8px rgba(50, 240, 140,0.45), inset 0 1px 0 rgba(96, 242, 189,0.2)',
                           transition: 'all 0.2s',
                         }}>
                           <svg width="22" height="22" viewBox="0 0 20 20" fill="#32f08c" style={{ marginLeft: '3px' }} aria-hidden>
@@ -420,9 +424,9 @@ export function TraeDemoSection(): React.ReactElement {
                             height: '32px', width: '32px',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             borderRadius: '4px',
-                            border: '1px solid rgba(50,240,140,0.2)',
+                            border: '1px solid rgba(50, 240, 140,0.2)',
                             background: 'rgba(0,0,0,0.72)',
-                            color: '#a6aab5',
+                            color: '#c9c5d2',
                             backdropFilter: 'blur(8px)',
                             cursor: 'pointer',
                             transition: 'border-color 0.2s, color 0.2s',
@@ -441,19 +445,19 @@ export function TraeDemoSection(): React.ReactElement {
                     alignItems: 'center',
                     gap: '8px',
                     padding: '9px 16px',
-                    borderTop: '1px solid rgba(50,240,140,0.1)',
-                    background: 'linear-gradient(90deg, rgba(50,240,140,0.04) 0%, #0d0e10 50%, rgba(50,240,140,0.04) 100%)',
+                    borderTop: '1px solid rgba(50, 240, 140,0.1)',
+                    background: 'linear-gradient(90deg, rgba(50, 240, 140,0.04) 0%, #0d0e10 50%, rgba(50, 240, 140,0.04) 100%)',
                   }}>
                     <span aria-hidden style={{
                       height: '6px', width: '6px', borderRadius: '50%',
                       background: '#32f08c',
-                      boxShadow: '0 0 7px 1px rgba(50,240,140,0.7)',
+                      boxShadow: '0 0 7px 1px rgba(50, 240, 140,0.7)',
                       flexShrink: 0,
                     }} />
-                    <span style={{ fontFamily: 'monospace', fontSize: '11px', color: '#787d87' }}>
+                    <span style={{ fontFamily: 'monospace', fontSize: '11px', color: '#8b8794' }}>
                       Senix · Analysis complete
                     </span>
-                    <span style={{ marginLeft: 'auto', fontFamily: 'monospace', fontSize: '11px', color: 'rgba(50,240,140,0.65)' }}>
+                    <span style={{ marginLeft: 'auto', fontFamily: 'monospace', fontSize: '11px', color: 'rgba(50, 240, 140,0.65)' }}>
                       ~30s
                     </span>
                   </div>
@@ -521,13 +525,13 @@ export function TraeDemoSection(): React.ReactElement {
             marginInline: 'auto',
           }}
         >
-          <p style={{ fontSize: '12px', color: '#787d87' }}>
+          <p style={{ fontSize: '12px', color: '#8b8794' }}>
             Real pull request. Real output. No staging environment.
           </p>
           <div style={{ display: 'flex', gap: '18px' }}>
             {['Analysis in 30s', 'Zero config', 'Private by default'].map((label) => (
-              <span key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#787d87' }}>
-                <span aria-hidden style={{ height: '6px', width: '6px', borderRadius: '50%', background: 'rgba(50,240,140,0.55)', flexShrink: 0 }} />
+              <span key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#8b8794' }}>
+                <span aria-hidden style={{ height: '6px', width: '6px', borderRadius: '50%', background: 'rgba(50, 240, 140,0.55)', flexShrink: 0 }} />
                 {label}
               </span>
             ))}

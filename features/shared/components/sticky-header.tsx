@@ -28,7 +28,7 @@ export function StickyHeader({
     return (
       <header
         className={`trae-nav-shell sticky top-0 z-40 border-b transition-colors duration-200 ${
-          scrolled ? 'border-white/[0.08] bg-[#0a0b0d]/90 backdrop-blur-md' : 'border-transparent'
+          scrolled ? 'border-white/[0.08] bg-[#09080c]/90 backdrop-blur-md' : 'border-transparent'
         }`}
       >
         {children}
