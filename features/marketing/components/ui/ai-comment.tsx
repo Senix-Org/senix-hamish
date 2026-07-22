@@ -62,7 +62,7 @@ export function AIComment({
     <div
       ref={ref}
       className={[
-        'ai-comment relative ml-4 rounded-[10px] border border-green-500/25 bg-zinc-900/95 p-3 shadow-lg shadow-black/30',
+        'ai-comment relative ml-4 rounded-[10px] border border-green-500/25 bg-[#0f0d14]/95 p-3 shadow-lg shadow-black/30',
         animate && !reduced ? 'opacity-0' : '',
         className,
       ].join(' ')}

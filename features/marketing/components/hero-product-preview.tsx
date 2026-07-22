@@ -130,17 +130,17 @@ export function HeroProductPreview(): React.ReactElement {
     <div className="hero-preview-perspective w-full max-w-[440px]">
       <div
         ref={frameRef}
-        className={`hero-preview-frame relative overflow-hidden rounded-[10px] border border-white/[0.1] bg-[#0B0D0C]/90 shadow-[0_24px_80px_-20px_rgba(0,0,0,0.7),0_0_0_1px_rgba(255,255,255,0.04)_inset] backdrop-blur-sm ${reduced ? '' : 'opacity-0'}`}
+        className={`hero-preview-frame relative overflow-hidden rounded-xl border border-white/[0.1] bg-[#0f0d14]/95 shadow-[0_24px_80px_-20px_rgba(0,0,0,0.75),0_0_0_1px_rgba(255,255,255,0.04)_inset] backdrop-blur-sm ${reduced ? '' : 'opacity-0'}`}
       >
         {/* Scan beam */}
         <div
           ref={scanRef}
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 z-20 h-16 bg-gradient-to-b from-green-500/20 via-green-400/10 to-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 z-20 h-16 bg-gradient-to-b from-green-500/25 via-green-400/10 to-transparent"
         />
 
         {/* Window chrome */}
-        <div className="flex items-center justify-between border-b border-white/[0.08] bg-zinc-900/50 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-white/[0.08] bg-[#0f0d14]/80 px-4 py-3">
           <div className="flex items-center gap-2.5">
             <span className="size-7 rounded-full bg-zinc-800 ring-1 ring-white/[0.06] grid place-items-center font-mono text-[10px] text-green-400">
               s
@@ -180,7 +180,7 @@ export function HeroProductPreview(): React.ReactElement {
           {/* AI insight */}
           <div
             data-preview-comment={reduced ? undefined : ''}
-            className={`mt-3 rounded-[8px] border border-green-500/20 bg-green-500/[0.06] p-3 ${reduced ? '' : 'opacity-0'}`}
+            className={`mt-3 rounded-[8px] border border-green-500/25 bg-green-500/[0.07] p-3 ${reduced ? '' : 'opacity-0'}`}
           >
             <p className="text-[11px] font-medium text-zinc-200">Behavioral summary</p>
             <p className="mt-1 text-[10px] leading-relaxed text-zinc-400">
@@ -201,7 +201,7 @@ export function HeroProductPreview(): React.ReactElement {
 
         {/* Footer meta */}
         <div className="border-t border-white/[0.06] px-4 py-2.5 text-[10px] text-zinc-600">
-          Analyzed in <span className="font-mono text-green-500/90">28s</span> · deepseek · 1,287 tokens
+          Analyzed in <span className="font-mono text-green-400/90">28s</span> · deepseek · 1,287 tokens
         </div>
       </div>
     </div>

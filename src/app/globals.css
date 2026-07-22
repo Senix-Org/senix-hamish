@@ -3,11 +3,29 @@
 
 /* TRAE outline CTAs must stay white on the dark landing page. */
 .trae-site a.trae-btn-outline {
-  color: #f5f9fe;
+  color: #ffffff;
 }
 
 .trae-site a.trae-btn-outline:hover {
-  color: #f5f9fe;
+  color: #ffffff;
+}
+
+.trae-site a.trae-btn-brand,
+.trae-site .trae-btn-brand,
+.trae-site .trae-nav-cta,
+.trae-site a.trae-btn-brand span,
+.trae-site .trae-btn-brand span,
+.trae-site .trae-nav-cta span {
+  color: #000000;
+}
+
+.trae-site a.trae-btn-brand:hover,
+.trae-site .trae-btn-brand:hover,
+.trae-site .trae-nav-cta:hover,
+.trae-site a.trae-btn-brand:hover span,
+.trae-site .trae-btn-brand:hover span,
+.trae-site .trae-nav-cta:hover span {
+  color: #000000;
 }
 
 .trae-site [data-testimonials-desc],
@@ -311,7 +329,7 @@ body {
 
 /* Hero product preview: subtle 3D perspective on hover */
 .hero-preview-perspective {
-  perspective: 1200px;
+  perspective: 1400px;
 }
 
 .hero-preview-frame {
@@ -320,17 +338,17 @@ body {
 }
 
 .hero-section {
-  background-color: #0a0a0b;
+  background-color: #09080c;
 }
 
-/* TRAE.ai hero layout (Senix copy + brand colors) — https://www.trae.ai/ */
+/* CodeRabbit-inspired hero layout for Senix marketing */
 :root {
   --senix-brand: #32f08c;
   --senix-brand-hover: #0fdc78;
   --trae-header-height: 64px;
-  --trae-bg: #0a0b0d;
-  --trae-text: #f5f9fe;
-  --trae-text-secondary: #a6aab5;
+  --trae-bg: #09080c;
+  --trae-text: #ffffff;
+  --trae-text-secondary: #c9c5d2;
 }
 
 .trae-hero {
@@ -341,7 +359,7 @@ body {
 }
 
 .trae-hero-bg-grid {
-  background-image: radial-gradient(rgba(150, 170, 158, 0.055) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(201, 197, 210, 0.06) 1px, transparent 1px);
   background-size: 22px 22px;
   background-position: 0 0;
   opacity: 0.55;
@@ -350,7 +368,7 @@ body {
 .trae-hero-bg-glow {
   background: radial-gradient(
     ellipse at center,
-    rgba(50, 240, 140, 0.2) 0%,
+    rgba(50, 240, 140, 0.22) 0%,
     rgba(50, 240, 140, 0.06) 42%,
     transparent 72%
   );
@@ -367,195 +385,124 @@ body {
 .trae-hero-inner {
   display: flex;
   flex-direction: column;
-  width: min(100%, 1600px);
+  align-items: center;
+  width: min(100%, 1120px);
   min-height: calc(100dvh - var(--trae-header-height));
   margin-inline: auto;
-  padding-inline: 16px;
-  padding-bottom: 16px;
+  padding: 36px 16px 32px;
+  gap: 32px;
 }
 
 @media (min-width: 744px) {
   .trae-hero-inner {
-    padding-inline: 24px;
-    padding-bottom: 24px;
+    padding: 64px 28px 48px;
+    gap: 52px;
   }
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 1100px) {
   .trae-hero-inner {
-    padding-inline: 32px;
-    padding-bottom: 32px;
-  }
-}
-
-.trae-hero-topline {
-  align-self: stretch;
-  height: 1px;
-  margin-bottom: 8px;
-  margin-top: 36px;
-  background: hsla(0, 0%, 100%, 0.18);
-}
-
-@media (min-width: 744px) {
-  .trae-hero-topline {
-    margin-bottom: 20px;
-  }
-}
-
-.trae-hero-body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-@media (min-width: 744px) {
-  .trae-hero-body {
     flex-direction: row;
-    margin-top: auto;
+    align-items: center;
+    justify-content: space-between;
+    gap: 48px;
+    padding-block: 72px 56px;
   }
 }
 
-.trae-hero-bottom {
-  padding-top: 32px;
-  padding-bottom: 8px;
-}
-
-.trae-hero-bottom-row {
+.trae-hero-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  max-width: 560px;
   width: 100%;
 }
 
-.trae-hero-corner {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  align-self: flex-end;
-  max-width: 578px;
-  margin-left: auto;
-  text-align: right;
+.trae-hero-brand {
+  font-size: clamp(40px, 7vw, 72px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--trae-text);
+  margin-bottom: 18px;
 }
 
-.trae-hero-main {
-  display: flex;
-  flex-direction: column;
-  padding-bottom: 24px;
-}
-
-@media (min-width: 744px) {
-  .trae-hero-main {
-    flex: 631 1;
-    max-width: 631px;
-  }
-}
-
-@media (min-width: 1280px) {
-  .trae-hero-main {
-    flex: 723 1;
-    max-width: 723px;
-  }
-}
-
-.trae-hero-titlebox {
-  font-size: 42px;
+.trae-hero-headline {
+  font-size: clamp(28px, 4.2vw, 48px);
   font-weight: 500;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: var(--trae-text);
+  max-width: 16ch;
 }
 
-@media (min-width: 744px) {
-  .trae-hero-titlebox {
-    font-size: 56px;
-    line-height: 1.12;
-  }
-}
-
-@media (min-width: 1280px) {
-  .trae-hero-titlebox {
-    font-size: 72px;
-    line-height: 1.08;
-  }
-}
-
-.trae-hero-title2 {
+.trae-hero-sub {
+  margin-top: 18px;
+  max-width: 38ch;
+  font-size: 17px;
+  line-height: 1.55;
   color: var(--trae-text-secondary);
 }
 
-.trae-hero-title1 {
-  color: var(--trae-text);
-}
-
-.trae-hero-side {
+.trae-hero-actions {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-end;
-  padding-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+  width: 100%;
 }
 
-@media (min-width: 744px) {
-  .trae-hero-side {
-    flex: 377 1;
-    align-items: flex-end;
-  }
+.trae-hero-actions > * {
+  flex: 1 1 100%;
 }
 
-@media (min-width: 1280px) {
-  .trae-hero-side {
-    flex: 496 1;
-    padding-right: 24px;
-  }
-}
-
-.trae-hero-desc {
+.trae-hero-actions .trae-shimmer-btn {
   display: flex;
-  flex-direction: column;
-  max-width: 578px;
-  margin-bottom: 8px;
-  font-size: 16px;
-  line-height: 1.6;
-  color: var(--trae-text);
-  text-align: right;
-  align-items: flex-end;
+  width: 100%;
 }
 
-.trae-hero-desc p {
-  text-align: right;
+.trae-hero-actions .trae-btn,
+.trae-hero-actions a {
+  width: 100%;
 }
 
-@media (min-width: 744px) {
-  .trae-hero-desc {
-    text-align: right;
-    align-items: flex-end;
+@media (min-width: 480px) {
+  .trae-hero-actions > * {
+    flex: 0 1 auto;
   }
 
-  .trae-hero-desc p {
-    text-align: right;
+  .trae-hero-actions .trae-shimmer-btn {
+    width: auto;
+  }
+
+  .trae-hero-actions .trae-btn,
+  .trae-hero-actions a {
+    width: auto;
   }
 }
 
-.trae-hero-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  align-self: flex-end;
-  margin-top: 12px;
-  font-size: 14px;
-  color: var(--trae-text-secondary);
-  transition: color 0.15s;
+.trae-hero-visual {
+  width: 100%;
+  max-width: 520px;
+  flex: 1;
+  display: flex;
+  justify-content: center;
 }
 
-.trae-hero-link:hover {
-  color: var(--trae-text);
+.trae-hero-visual .hero-preview-perspective {
+  width: 100%;
+  max-width: 520px;
 }
 
 .trae-nav-shell {
   height: var(--trae-header-height);
-  background: var(--trae-bg);
+  background: rgba(9, 8, 12, 0.72);
+  backdrop-filter: blur(12px);
 }
 
 .trae-nav-inner {
-  width: min(100%, 1600px);
+  width: min(100%, 1200px);
   margin-inline: auto;
   padding-inline: 16px;
 }

@@ -1,16 +1,15 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useRef } from 'react';
-import { ChevronRight } from 'lucide-react';
 import { HeroAuthCta } from '@features/shared/components/auth-cta';
 import { TraeButton } from '../ui/trae-button';
 import { TraeHeroBackground } from './hero-background';
-import { TraeSoloTiles } from './solo-tiles';
+import { HeroProductPreview } from '../hero-product-preview';
 import { useReducedMotion } from '../../hooks/use-reduced-motion';
 
 /**
- * TRAE.ai hero layout with dot-matrix background and bottom-right CTA block.
+ * CodeRabbit-inspired hero: brand, one claim, short support, CTA pair,
+ * and a full-bleed product preview as the visual anchor.
  */
 export function TraeHeroSection(): React.ReactElement {
   const sectionRef = useRef<HTMLElement>(null);
@@ -29,14 +28,14 @@ export function TraeHeroSection(): React.ReactElement {
       ctx = gsap.context(() => {
         gsap.fromTo(
           targets,
-          { opacity: 0, y: 20 },
+          { opacity: 0, y: 22 },
           {
             opacity: 1,
             y: 0,
-            duration: 0.7,
+            duration: 0.75,
             ease: 'power3.out',
-            stagger: 0.07,
-            delay: 0.05,
+            stagger: 0.08,
+            delay: 0.04,
           },
         );
 
@@ -62,64 +61,34 @@ export function TraeHeroSection(): React.ReactElement {
     <section ref={sectionRef} className="trae-hero relative overflow-hidden">
       <TraeHeroBackground />
 
-      <div className="trae-hero-inner relative z-10 flex flex-col">
-        <div aria-hidden className="trae-hero-topline hidden md:block" data-trae-reveal />
+      <div className="trae-hero-inner relative z-10">
+        <div className="trae-hero-copy">
+          <div className={`trae-hero-brand ${hidden}`} data-trae-reveal>
+            Senix
+          </div>
 
-        <div className="trae-hero-main">
-          <div className={`trae-hero-titlebox ${hidden}`} data-trae-reveal>
-            <div className="mb-5">
-              <Link href="/dashboard/connect" className="trae-announcement-pill">
-                <span className="trae-announcement-badge">New</span>
-                <span>MCP integration for Cursor and Claude Code</span>
-                <ChevronRight
-                  size={13}
-                  className="text-[#32f08c] transition group-hover:translate-x-0.5"
-                  aria-hidden
-                />
-              </Link>
-            </div>
-            <div className="trae-hero-title2">AI code review</div>
-            <div className="trae-hero-title1">
-              for your{' '}
-              <span className="trae-hero-accent trae-gradient-text">pull requests.</span>
-            </div>
+          <h1 className={`trae-hero-headline ${hidden}`} data-trae-reveal>
+            Cut code review time{' '}
+            <span className="trae-hero-accent trae-gradient-text">&amp; risk</span>
+            , instantly.
+          </h1>
+
+          <p className={`trae-hero-sub ${hidden}`} data-trae-reveal>
+            Behavioral PR summaries for AI-powered teams who move fast without shipping blind.
+          </p>
+
+          <div className={`trae-hero-actions ${hidden}`} data-trae-reveal>
+            <span className="trae-shimmer-btn inline-flex rounded-lg">
+              <HeroAuthCta trae />
+            </span>
+            <TraeButton variant="outline" href="/playground">
+              Try playground
+            </TraeButton>
           </div>
         </div>
 
-        <div className="trae-hero-bottom flex flex-1 flex-col justify-end">
-          <div className="trae-hero-bottom-row flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
-            <div data-trae-reveal className={hidden}>
-              <TraeSoloTiles className="pt-0" />
-            </div>
-
-            <div className={`trae-hero-corner ${hidden}`} data-trae-reveal>
-              <div className="trae-hero-desc">
-                <p>
-                  Senix reads every PR your team opens and posts a behavioral summary with risk level
-                  as a comment within 30 seconds.
-                </p>
-                <p>Built for teams shipping with Cursor, Copilot, and Claude Code.</p>
-              </div>
-
-              <div className="mt-3 flex flex-row flex-wrap justify-end gap-3">
-                <span className="trae-shimmer-btn inline-flex rounded-md">
-                  <HeroAuthCta trae />
-                </span>
-                <TraeButton variant="outline" href="#how-it-works">
-                  See how it works
-                </TraeButton>
-              </div>
-
-              <Link href="/playground" className="trae-hero-link group">
-                Try the playground
-                <ChevronRight
-                  size={16}
-                  className="text-[#a6aab5] transition group-hover:translate-x-0.5 group-hover:text-[#f5f9fe]"
-                  aria-hidden
-                />
-              </Link>
-            </div>
-          </div>
+        <div className={`trae-hero-visual ${hidden}`} data-trae-reveal>
+          <HeroProductPreview />
         </div>
       </div>
     </section>

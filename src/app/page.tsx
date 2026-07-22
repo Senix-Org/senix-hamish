@@ -103,7 +103,7 @@ export default async function HomePage({
   return (
     <div className="trae-site">
       <JsonLd data={landingSchemas} />
-      {/* CodeRabbit-style fixed page-top gradient mesh */}
+      {/* CodeRabbit-inspired fixed page-top green gradient mesh */}
       <div className="trae-page-gradient" aria-hidden />
       {/* CardBeamEffect: no SSR, no main-thread cost at startup */}
       <CardBeamEffect />

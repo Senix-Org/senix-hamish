@@ -10,8 +10,12 @@ type SignInVariant =
   | 'text'
   | 'hero'
   | 'trae'
+  | 'trae-nav'
+  | 'trae-nav-ghost'
   | 'mobile-primary'
-  | 'mobile-secondary';
+  | 'mobile-secondary'
+  | 'mobile-trae-primary'
+  | 'mobile-trae-secondary';
 
 type Props = {
   /** Optional override for the post-callback redirect path. */
@@ -124,14 +128,17 @@ export default function SignInButton({
 }
 
 function containerClass(variant: SignInVariant): string {
-  if (variant === 'text') {
+  if (variant === 'text' || variant === 'trae-nav-ghost') {
     return 'relative inline-flex flex-col items-start';
   }
-  if (variant === 'hero') {
+  if (variant === 'hero' || variant === 'trae') {
     return 'inline-flex flex-col items-center gap-2';
   }
-  if (variant === 'trae') {
-    return 'inline-flex flex-col items-center gap-2';
+  if (variant === 'trae-nav') {
+    return 'inline-flex flex-col items-stretch';
+  }
+  if (variant === 'mobile-trae-primary' || variant === 'mobile-trae-secondary') {
+    return 'flex w-full flex-col items-stretch gap-2';
   }
   return 'flex flex-col items-stretch gap-2';
 }
@@ -146,13 +153,21 @@ function buttonClass(variant: SignInVariant): string {
     case 'hero':
       return `${base} btn-senix btn-senix-primary px-5 !h-auto py-3 text-sm`;
     case 'trae':
-      return `${base} trae-btn trae-btn-brand inline-flex h-10 min-w-[96px] items-center justify-center rounded-md bg-[var(--trae-brand)] px-6 text-sm font-medium tracking-wide text-[#0a0b0d] hover:bg-[var(--trae-brand-hover)] xl:h-16 xl:px-7 xl:text-base`;
+      return `${base} trae-btn trae-btn-brand inline-flex h-10 min-w-[96px] items-center justify-center rounded-lg px-6 text-[15px] font-medium tracking-normal xl:h-12 xl:px-7 xl:text-base`;
+    case 'trae-nav':
+      return `${base} trae-nav-cta`;
+    case 'trae-nav-ghost':
+      return `${base} trae-nav-ghost`;
     case 'secondary':
       return `${base} btn-senix btn-senix-secondary px-4 !h-auto py-2.5 text-sm`;
     case 'mobile-primary':
       return `${base} btn-senix btn-senix-primary w-full !h-auto py-3`;
     case 'mobile-secondary':
       return `${base} btn-senix btn-senix-secondary w-full !h-auto py-3`;
+    case 'mobile-trae-primary':
+      return `${base} trae-nav-cta !h-11 w-full rounded-lg text-[15px]`;
+    case 'mobile-trae-secondary':
+      return `${base} trae-nav-ghost !h-11 w-full justify-center rounded-lg border border-white/[0.12] text-[15px]`;
     case 'primary':
     default:
       return `${base} btn-senix btn-senix-primary px-3.5 !h-auto py-1.5 text-sm`;
@@ -160,10 +175,10 @@ function buttonClass(variant: SignInVariant): string {
 }
 
 function errorClass(variant: SignInVariant): string {
-  if (variant === 'text') {
+  if (variant === 'text' || variant === 'trae-nav-ghost') {
     return 'absolute top-full mt-2 w-56 rounded-md border border-red-900/40 bg-red-950/80 px-2 py-1 text-xs text-red-200 shadow-lg shadow-black/20';
   }
-  if (variant === 'hero') {
+  if (variant === 'hero' || variant === 'trae') {
     return 'max-w-xs text-center text-red-400 text-xs';
   }
   return 'text-red-400 text-xs';

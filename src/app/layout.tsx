@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter, JetBrains_Mono } from "next/font/google";
+import { Geist, Geist_Mono, JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import { rootMetadata } from "@/lib/seo";
 import "./globals.css";
 
 // Critical fonts for the landing page — preloaded, swap on miss.
-const inter = Inter({
-  variable: "--font-inter",
+const plusJakarta = Plus_Jakarta_Sans({
+  variable: "--font-plus-jakarta",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -46,7 +46,7 @@ export default function RootLayout({
       lang="en"
       // data-scroll-behavior silences the Next.js smooth-scroll warning
       data-scroll-behavior="smooth"
-      className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${plusJakarta.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

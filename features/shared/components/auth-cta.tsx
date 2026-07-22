@@ -38,18 +38,42 @@ function useLoggedIn(): boolean | null {
   return loggedIn;
 }
 
-function DashboardLink({ className }: { className: string }): React.ReactElement {
+function DashboardLink({
+  className,
+  label = 'Go to dashboard',
+}: {
+  className: string;
+  label?: string;
+}): React.ReactElement {
   return (
     <Link href="/dashboard" className={`group ${className}`}>
-      <span>Go to dashboard</span>
-      <ArrowRight size={16} className="shrink-0 transition-transform group-hover:translate-x-0.5" />
+      <span>{label}</span>
+      <ArrowRight size={14} className="shrink-0 transition-transform group-hover:translate-x-0.5" />
     </Link>
   );
 }
 
 /** Desktop nav cluster: "Go to dashboard" when signed in, else Sign in + Get started. */
-export function DesktopAuthCta(): React.ReactElement {
+export function DesktopAuthCta({ trae = false }: { trae?: boolean } = {}): React.ReactElement {
   const loggedIn = useLoggedIn();
+
+  if (trae) {
+    if (loggedIn) {
+      return (
+        <DashboardLink
+          label="Dashboard"
+          className="trae-nav-cta inline-flex items-center justify-center gap-1.5"
+        />
+      );
+    }
+    return (
+      <div className="flex items-center gap-2.5">
+        <SignInButton label="Sign in" variant="trae-nav-ghost" />
+        <SignInButton label="Try it for free" variant="trae-nav" showArrow />
+      </div>
+    );
+  }
+
   if (loggedIn) {
     return (
       <DashboardLink className="btn-senix btn-senix-primary inline-flex items-center justify-center gap-1.5 px-3.5 !h-auto py-1.5 text-sm" />
@@ -64,8 +88,26 @@ export function DesktopAuthCta(): React.ReactElement {
 }
 
 /** Mobile menu cluster. */
-export function MobileAuthCta(): React.ReactElement {
+export function MobileAuthCta({ trae = false }: { trae?: boolean } = {}): React.ReactElement {
   const loggedIn = useLoggedIn();
+
+  if (trae) {
+    if (loggedIn) {
+      return (
+        <DashboardLink
+          label="Dashboard"
+          className="trae-nav-cta inline-flex !h-11 w-full items-center justify-center gap-1.5 rounded-lg text-[15px]"
+        />
+      );
+    }
+    return (
+      <>
+        <SignInButton label="Try it for free" variant="mobile-trae-primary" showArrow />
+        <SignInButton label="Sign in" variant="mobile-trae-secondary" />
+      </>
+    );
+  }
+
   if (loggedIn) {
     return (
       <DashboardLink className="btn-senix btn-senix-primary inline-flex w-full items-center justify-center gap-1.5 !h-auto py-3" />
@@ -83,12 +125,23 @@ export function MobileAuthCta(): React.ReactElement {
 export function HeroAuthCta({ trae = false }: { trae?: boolean } = {}): React.ReactElement {
   const loggedIn = useLoggedIn();
   const traeClass =
-    'trae-btn trae-btn-brand inline-flex h-10 min-w-[96px] items-center justify-center rounded-md bg-[var(--trae-brand)] px-6 text-sm font-medium tracking-wide text-[#0a0b0d] hover:bg-[var(--trae-brand-hover)] xl:h-16 xl:px-7 xl:text-base';
+    'trae-btn trae-btn-brand group inline-flex h-10 min-w-[96px] items-center justify-center gap-2 rounded-lg px-6 text-[15px] font-medium tracking-normal xl:h-12 xl:px-7 xl:text-base';
   const defaultClass =
     'btn-senix btn-senix-primary inline-flex items-center justify-center gap-1.5 px-5 !h-auto py-3 text-sm';
 
   if (loggedIn) {
-    return <DashboardLink className={`group ${trae ? traeClass : defaultClass}`} />;
+    return (
+      <DashboardLink
+        label="Open dashboard"
+        className={trae ? traeClass : defaultClass}
+      />
+    );
   }
-  return <SignInButton label="Get started free" variant={trae ? 'trae' : 'hero'} />;
+  return (
+    <SignInButton
+      label={trae ? 'Try it for free' : 'Get started free'}
+      variant={trae ? 'trae' : 'hero'}
+      showArrow={trae}
+    />
+  );
 }

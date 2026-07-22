@@ -61,13 +61,13 @@ export function TraePrivacySection(): React.ReactElement {
   return (
     <section ref={ref} className="trae-section border-t border-white/[0.08] py-20 md:py-28">
       <div data-trae-item className="mx-auto max-w-3xl text-center opacity-0">
-        <h2 className="text-3xl font-medium tracking-tight text-[#f5f9fe] md:text-5xl md:leading-tight">
+        <h2 className="text-3xl font-medium tracking-tight text-[#ffffff] md:text-5xl md:leading-tight">
           Privacy and{' '}
           <span ref={accentRef} className="trae-privacy-accent trae-gradient-text inline-block">
             Security
           </span>
         </h2>
-        <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-[#a6aab5] md:text-lg">
+        <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-[#c9c5d2] md:text-lg">
           Senix prioritizes protecting your code and account data, with minimal collection and
           transparent GitHub App permissions.
         </p>
@@ -81,14 +81,14 @@ export function TraePrivacySection(): React.ReactElement {
             className="trae-privacy-card trae-card trae-spotlight trae-card-gradient-border group flex min-h-[260px] flex-col p-6 opacity-0 md:min-h-[300px] md:p-8"
           >
             <div className="trae-spotlight-inner" />
-            <h3 className="text-lg font-medium text-[#f5f9fe] md:text-xl">{title}</h3>
-            <p className="mt-4 flex-1 text-sm leading-relaxed text-[#a6aab5] md:text-[15px]">
+            <h3 className="text-lg font-medium text-[#ffffff] md:text-xl">{title}</h3>
+            <p className="mt-4 flex-1 text-sm leading-relaxed text-[#c9c5d2] md:text-[15px]">
               {body}
             </p>
             <Icon
               size={22}
               strokeWidth={1.75}
-              className="trae-privacy-icon mt-8 shrink-0 text-[#32f08c] transition duration-300 group-hover:drop-shadow-[0_0_12px_rgba(50,240,140,0.55)]"
+              className="trae-privacy-icon mt-8 shrink-0 text-[#32f08c] transition duration-300 group-hover:drop-shadow-[0_0_12px_rgba(50, 240, 140,0.55)]"
               aria-hidden
             />
           </article>

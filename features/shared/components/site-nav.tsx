@@ -52,11 +52,11 @@ export function SiteNav({ rightSlot, variant = 'default' }: SiteNavProps = {}): 
             src="/logo.png"
             alt=""
             className={`h-7 w-7 rounded-md transition ${
-              isTrae ? 'ring-1 ring-white/10 group-hover:ring-green-500/40' : 'ring-1 ring-zinc-800 group-hover:ring-green-500/40'
+              isTrae ? 'ring-1 ring-white/10 group-hover:ring-[#32f08c]/50' : 'ring-1 ring-zinc-800 group-hover:ring-green-500/40'
             }`}
           />
           <span
-            className={`font-mono text-sm tracking-tight ${isTrae ? 'text-[#f5f9fe]' : 'text-zinc-100'}`}
+            className={`text-sm tracking-tight font-semibold ${isTrae ? 'text-white' : 'font-mono text-zinc-100'}`}
           >
             senix
           </span>
@@ -70,7 +70,7 @@ export function SiteNav({ rightSlot, variant = 'default' }: SiteNavProps = {}): 
             <MarketingNavLink
               key={l.href}
               href={l.href}
-              className={isTrae ? 'text-[#a6aab5] hover:text-[#f5f9fe]' : undefined}
+              className={isTrae ? 'text-[#c9c5d2] hover:text-white' : undefined}
             >
               {l.label}
             </MarketingNavLink>
@@ -79,22 +79,12 @@ export function SiteNav({ rightSlot, variant = 'default' }: SiteNavProps = {}): 
 
         <div className="hidden md:flex items-center gap-3 shrink-0">{right}</div>
 
-        <MobileMenu links={PRIMARY_NAV_LINKS} />
+        <MobileMenu links={PRIMARY_NAV_LINKS} variant={variant} />
       </div>
     </StickyHeader>
   );
 }
 
 function PublicAuthCluster({ variant }: { variant: 'default' | 'trae' }): React.ReactElement {
-  if (variant === 'trae') {
-    return (
-      <Link
-        href="/login"
-        className="inline-flex h-9 items-center justify-center rounded-md border border-white/20 px-4 text-sm font-medium text-[#f5f9fe] transition hover:bg-white/[0.08]"
-      >
-        Sign in
-      </Link>
-    );
-  }
-  return <DesktopAuthCta />;
+  return <DesktopAuthCta trae={variant === 'trae'} />;
 }
