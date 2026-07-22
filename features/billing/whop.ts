@@ -1,4 +1,3 @@
-import { createHmac, timingSafeEqual } from 'crypto';
 import type { PlanName } from '@features/billing/plan-limits';
 
 export type PaidPlanName = Exclude<PlanName, 'free'>;
@@ -47,6 +46,43 @@ export function whopCheckoutUrlForPlanId(planId: string): string {
   return `https://whop.com/checkout/${encodeURIComponent(planId)}`;
 }
 
+// --- Credit packs (one-time top-up products) ---------------------------------
+
+export type CreditPackName = 'small' | 'large';
+
+/** Token grants per pack (confirmed 2026-07-17): $10 = 200k tokens, $25 = 600k. */
+export const CREDIT_PACK_DETAILS: Record<CreditPackName, { label: string; price: number; credits: number }> = {
+  small: { label: 'Small credit pack', price: 10, credits: 200_000 },
+  large: { label: 'Large credit pack', price: 25, credits: 600_000 },
+};
+
+const CREDIT_PACK_ENV_VARS: Record<CreditPackName, { plan: string; product: string }> = {
+  small: { plan: 'WHOP_CREDITS_SMALL_ID', product: 'WHOP_CREDITS_SMALL_PRODUCT_ID' },
+  large: { plan: 'WHOP_CREDITS_LARGE_ID', product: 'WHOP_CREDITS_LARGE_PRODUCT_ID' },
+};
+
+/** Resolve the configured Whop plan ID for a credit pack, if any. */
+export function creditPackPlanId(pack: CreditPackName): string | null {
+  return process.env[CREDIT_PACK_ENV_VARS[pack].plan]?.trim() || null;
+}
+
+/**
+ * Reverse lookup: which credit pack a Whop plan or product id belongs to.
+ * Used by the payment.succeeded webhook to route one-time credit purchases
+ * away from the subscription logic.
+ */
+export function creditPackForWhopIds(input: {
+  planId?: string | null;
+  productId?: string | null;
+}): CreditPackName | null {
+  for (const pack of Object.keys(CREDIT_PACK_ENV_VARS) as CreditPackName[]) {
+    const vars = CREDIT_PACK_ENV_VARS[pack];
+    if (input.planId && process.env[vars.plan]?.trim() === input.planId) return pack;
+    if (input.productId && process.env[vars.product]?.trim() === input.productId) return pack;
+  }
+  return null;
+}
+
 /**
  * Resolve the Whop plan ID a checkout should use for a paid plan. Prefers the
  * period-specific pre-created plan ID (the secure SDK checkout path needs a
@@ -81,24 +117,6 @@ export function planForWhopProductId(productId: string | null | undefined): Paid
   ];
 
   return entries.find(([, id]) => id === productId)?.[0] ?? null;
-}
-
-export function verifyWhopSignature(rawBody: string, signature: string | null): boolean {
-  const secret = process.env.WHOP_WEBHOOK_SECRET;
-  if (!secret || !signature) return false;
-
-  const expected = createHmac('sha256', secret).update(rawBody).digest('hex');
-  const candidates = signature
-    .split(',')
-    .map((part) => part.trim())
-    .flatMap((part) => {
-      if (part.startsWith('sha256=')) return [part.slice('sha256='.length)];
-      if (part.startsWith('v1=')) return [part.slice('v1='.length)];
-      return [part];
-    })
-    .filter((part) => /^[a-f0-9]{64}$/i.test(part));
-
-  return candidates.some((candidate) => safeEqualHex(candidate, expected));
 }
 
 export async function createWhopCheckoutLink(input: {
@@ -319,13 +337,6 @@ function numberOrEmptyEquals(value: unknown, expected: number): boolean {
   }
 
   return numberEquals(value, expected);
-}
-
-function safeEqualHex(left: string, right: string): boolean {
-  const leftBuffer = Buffer.from(left, 'hex');
-  const rightBuffer = Buffer.from(right, 'hex');
-  if (leftBuffer.length !== rightBuffer.length) return false;
-  return timingSafeEqual(leftBuffer, rightBuffer);
 }
 
 async function readJson(response: Response): Promise<unknown> {

@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@features/shared/supabase-server';
 import { supabaseAdmin } from '@features/shared/supabase';
-import { resolveCheckoutPlanId } from '@features/billing/whop';
-import type { BillingPeriod, PaidPlanName } from '@features/billing/whop';
+import { creditPackPlanId, resolveCheckoutPlanId } from '@features/billing/whop';
+import type { BillingPeriod, CreditPackName, PaidPlanName } from '@features/billing/whop';
 import { whopsdk } from '@/lib/whop-sdk';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const PAID_PLANS = new Set<PaidPlanName>(['starter', 'team', 'pro']);
+const CREDIT_PACKS = new Set<CreditPackName>(['small', 'large']);
 
 type CheckoutResponse = {
   sessionId: string;
@@ -68,27 +69,53 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
   }
 
-  const plan = parsePlan(body);
-  if (plan === 'free') {
-    return NextResponse.json({ error: 'Free plan does not need checkout.' }, { status: 400 });
-  }
-  if (!PAID_PLANS.has(plan as PaidPlanName)) {
-    return NextResponse.json({ error: 'Unknown billing plan.' }, { status: 400 });
-  }
-
-  const period = parsePeriod(body);
-  const planId = resolveCheckoutPlanId(plan as PaidPlanName, period);
-  if (!planId) {
-    return NextResponse.json({ error: 'Whop plan is not configured.' }, { status: 500 });
-  }
-
   const origin = process.env.NEXT_PUBLIC_SITE_URL ?? req.nextUrl.origin;
+
+  // One-time credit pack purchase: { kind: 'credits', pack: 'small' | 'large' }.
+  // Same security model as plans: identity travels only via checkout metadata.
+  const kind =
+    body && typeof body === 'object' && (body as Record<string, unknown>).kind === 'credits'
+      ? 'credits'
+      : 'plan';
+
+  let planId: string | null;
+  let metadata: Record<string, string>;
+
+  if (kind === 'credits') {
+    const pack =
+      body && typeof body === 'object' && typeof (body as Record<string, unknown>).pack === 'string'
+        ? ((body as Record<string, unknown>).pack as string).toLowerCase()
+        : '';
+    if (!CREDIT_PACKS.has(pack as CreditPackName)) {
+      return NextResponse.json({ error: 'Unknown credit pack.' }, { status: 400 });
+    }
+    planId = creditPackPlanId(pack as CreditPackName);
+    if (!planId) {
+      return NextResponse.json({ error: 'Credit pack is not configured.' }, { status: 500 });
+    }
+    metadata = { user_id: appUser.id, kind: 'credits', pack };
+  } else {
+    const plan = parsePlan(body);
+    if (plan === 'free') {
+      return NextResponse.json({ error: 'Free plan does not need checkout.' }, { status: 400 });
+    }
+    if (!PAID_PLANS.has(plan as PaidPlanName)) {
+      return NextResponse.json({ error: 'Unknown billing plan.' }, { status: 400 });
+    }
+
+    const period = parsePeriod(body);
+    planId = resolveCheckoutPlanId(plan as PaidPlanName, period);
+    if (!planId) {
+      return NextResponse.json({ error: 'Whop plan is not configured.' }, { status: 500 });
+    }
+    metadata = { user_id: appUser.id, plan, period };
+  }
 
   try {
     const config = await whopsdk.checkoutConfigurations.create({
       plan_id: planId,
       // The verified webhook is matched back to this user via metadata.user_id.
-      metadata: { user_id: appUser.id, plan, period },
+      metadata,
       redirect_url: `${origin}/checkout/complete`,
     });
 

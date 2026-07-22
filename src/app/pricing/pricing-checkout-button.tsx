@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { WhopCheckoutDialog } from '@/components/whop-checkout-dialog';
-import type { PlanName } from '@features/billing/plan-limits';
+import type { PlanName } from '@features/billing/plans';
 
 type BillingPeriod = 'monthly' | 'yearly';
 type PaidPlan = Exclude<PlanName, 'free'>;

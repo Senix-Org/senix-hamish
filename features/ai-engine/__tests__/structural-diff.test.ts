@@ -2,11 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { diffFile } from '@features/ai-engine/structural-diff';
 
 /**
- * Proves: the structural diff identifies changed functions across all five
- * supported languages (JS, TS, TSX, JSX, Python), and marks unsupported
- * files as such.
+ * Proves: the structural diff identifies changed functions across all supported
+ * languages (JS, TS, TSX, JSX, Python), and marks unsupported files as such.
  * Failure means: the LLM would receive a wrong or empty structural picture
  * and produce lower-quality reviews.
+ *
+ * Note: parseFile and diffFile are now synchronous (regex-based, no WASM), so
+ * no await needed.
  */
 
 function findChange(diff: ReturnType<typeof diffFile>, name: string) {
@@ -60,5 +62,28 @@ describe('diffFile structural analysis', () => {
     expect(diff.supported).toBe(false);
     expect(diff.language).toBeNull();
     expect(diff.changes).toHaveLength(0);
+  });
+
+  it('detects a class in JavaScript', () => {
+    const diff = diffFile('app.js', 'class OldName {}', 'class NewName {}');
+    expect(findChange(diff, 'NewName')?.change).toBe('added');
+    expect(findChange(diff, 'OldName')?.change).toBe('removed');
+  });
+
+  it('detects arrow function assigned to const', () => {
+    const before = `const handler = (x) => x + 1;`;
+    const after = `const handler = (x) => x + 2;`;
+    const diff = diffFile('utils.js', before, after);
+    expect(findChange(diff, 'handler')?.change).toBe('modified');
+  });
+
+  it('returns empty structural diff for null content (new file / deletion)', () => {
+    const addedDiff = diffFile('new-file.js', null, 'function hello() {}');
+    expect(addedDiff.supported).toBe(true);
+    expect(findChange(addedDiff, 'hello')?.change).toBe('added');
+
+    const removedDiff = diffFile('old-file.js', 'function bye() {}', null);
+    expect(removedDiff.supported).toBe(true);
+    expect(findChange(removedDiff, 'bye')?.change).toBe('removed');
   });
 });

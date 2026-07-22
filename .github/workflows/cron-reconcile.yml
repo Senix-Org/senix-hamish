@@ -1,4 +1,4 @@
-name: Daily subscription reconciliation
+name: Daily maintenance (reconciliation + hotfix scan)
 
 # Replaces the Vercel cron that vercel.json used to define. Cloudflare cron
 # triggers invoke a Worker's scheduled() handler rather than an HTTP route,
@@ -25,6 +25,45 @@ jobs:
           cat /tmp/body
           if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
             echo "Reconciliation failed with HTTP $status"
+            exit 1
+          fi
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+      - name: Detect stranded analyses (waitUntil watchdog)
+        # Runs even if reconciliation failed: the jobs are independent. A
+        # non-zero strandedFound fails this step so the workflow's failure
+        # notification surfaces silent analysis deaths.
+        if: always()
+        run: |
+          status=$(curl -s -o /tmp/stranded-body -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            https://senix.dev/api/internal/check-stranded-analyses)
+          cat /tmp/stranded-body
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "Stranded analysis scan failed with HTTP $status"
+            exit 1
+          fi
+          found=$(python3 -c "import json;print(json.load(open('/tmp/stranded-body')).get('strandedFound',0))")
+          if [ "$found" -gt 0 ]; then
+            echo "Watchdog found $found stranded analyses (marked failed) — investigate."
+            exit 1
+          fi
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+      - name: Scan merged PRs for post-merge hotfixes
+        # Runs even if reconciliation failed: the two jobs are independent.
+        if: always()
+        run: |
+          status=$(curl -s -o /tmp/hotfix-body -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            https://senix.dev/api/internal/check-hotfixes)
+          cat /tmp/hotfix-body
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "Hotfix scan failed with HTTP $status"
             exit 1
           fi
         env:

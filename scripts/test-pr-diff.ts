@@ -29,7 +29,7 @@ import 'dotenv/config';
          ? null
          : await fetchFileContent(INSTALLATION_ID, OWNER, REPO, file.filename, HEAD_SHA);
    
-       const diff = diffFile(file.filename, before, after);
+       const diff = await diffFile(file.filename, before, after);
        console.log(`\n  ${file.filename} (${lang})`);
        console.log(`    +${diff.summary.added} -${diff.summary.removed} ~${diff.summary.modified}`);
        for (const c of diff.changes.filter((c) => c.change !== 'unchanged')) {

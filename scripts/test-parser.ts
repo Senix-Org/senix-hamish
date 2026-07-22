@@ -21,9 +21,16 @@ import { diffFile } from '@features/ai-engine/structural-diff';
    }
    `;
    
-   const diff = diffFile('sample.js', before, after);
-   console.log(`File: ${diff.filename} (${diff.language})`);
-   console.log(`Summary: +${diff.summary.added} -${diff.summary.removed} ~${diff.summary.modified} =${diff.summary.unchanged}`);
-   for (const c of diff.changes) {
-     console.log(`  ${c.change.padEnd(10)} ${c.kind.padEnd(8)} ${c.id}`);
+   async function main(): Promise<void> {
+     const diff = await diffFile('sample.js', before, after);
+     console.log(`File: ${diff.filename} (${diff.language})`);
+     console.log(`Summary: +${diff.summary.added} -${diff.summary.removed} ~${diff.summary.modified} =${diff.summary.unchanged}`);
+     for (const c of diff.changes) {
+       console.log(`  ${c.change.padEnd(10)} ${c.kind.padEnd(8)} ${c.id}`);
+     }
    }
+
+   main().catch((err) => {
+     console.error(err);
+     process.exit(1);
+   });

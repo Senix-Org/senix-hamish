@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
+import posthog from 'posthog-js';
 import { createBrowserSupabaseClient } from '@features/shared/supabase-browser';
 
 /**
@@ -22,6 +23,9 @@ export default function SignOutButton({
     setBusy(true);
     const supabase = createBrowserSupabaseClient();
     await supabase.auth.signOut();
+    // Detach the analytics session so the next anonymous visitor on this
+    // browser is not attributed to the user who just signed out.
+    if (typeof posthog.reset === 'function') posthog.reset();
     router.push('/');
     router.refresh();
   }

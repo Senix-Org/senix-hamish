@@ -1,16 +1,11 @@
-export const PLAN_LIMITS = {
-  free: { repos: 1, tokens: 50_000, label: 'Free' },
-  starter: { repos: 3, tokens: 400_000, label: 'Starter' },
-  team: { repos: 15, tokens: 1_000_000, label: 'Team' },
-  pro: { repos: -1, tokens: 2_500_000, label: 'Pro' },
-} as const;
+import { captureServerEvent } from '@features/shared/posthog-server';
+import { PLAN_LIMITS, PLAN_ORDER } from '@features/billing/plans';
+import type { PlanName, PlanStatus, TokenSource } from '@features/billing/plans';
 
-export const PLAN_ORDER = ['free', 'starter', 'team', 'pro'] as const;
-
-export type PlanName = keyof typeof PLAN_LIMITS;
-export type PlanStatus = 'active' | 'trialing' | 'cancelled' | 'past_due';
-/** Where a token charge originated. Single shared monthly budget. */
-export type TokenSource = 'pr' | 'mcp' | 'playground';
+// Re-export the pure plan data/types so existing server-side importers of
+// '@features/billing/plan-limits' keep working unchanged.
+export { PLAN_LIMITS, PLAN_ORDER };
+export type { PlanName, PlanStatus, TokenSource };
 
 export type UserPlan = {
   userId: string;
@@ -39,6 +34,16 @@ type UserPlanRow = {
 };
 
 type LimitResult = { allowed: true } | { allowed: false; reason: string };
+
+export type TokenLimitResult =
+  | {
+      allowed: true;
+      /** Portion of the reserve debited from the monthly budget. */
+      fromMonthly: number;
+      /** Portion of the reserve debited from purchased credit packs. */
+      fromPacks: number;
+    }
+  | { allowed: false; reason: string };
 
 /**
  * Up-front token estimate reserved per review at gate time. Shared by every
@@ -163,11 +168,13 @@ export async function getUserPlan(userId: string): Promise<UserPlan> {
 }
 
 /**
- * Token budget gate. Atomically checks AND reserves the estimate against the
- * user's monthly budget via the increment_token_usage RPC (migration 012):
- * the user row is locked FOR UPDATE, so concurrent reviews cannot all read
- * the same pre-call usage and collectively exceed the budget. When blocked,
- * nothing is debited.
+ * Token budget gate. Atomically checks AND reserves the estimate via the
+ * consume_tokens RPC (migration 016): the user row is locked FOR UPDATE, so
+ * concurrent reviews cannot all read the same pre-call usage and collectively
+ * exceed the budget. The RPC drains the monthly budget first, then purchased
+ * credit packs oldest-expiring first. When blocked, nothing is debited.
+ * (increment_token_usage from migration 012 is superseded here but kept in
+ * the database.)
  *
  * The monthly counter reset runs first (inside getUserPlan), BEFORE the RPC,
  * so the reservation always lands in the current period. Note on the reset:
@@ -184,20 +191,26 @@ export async function getUserPlan(userId: string): Promise<UserPlan> {
 export async function checkTokenLimit(
   userId: string,
   estimatedTokens: number,
-  // `source` is accepted for call-site clarity and future per-source metering.
-  _source: TokenSource
-): Promise<LimitResult> {
+  // The review source (pr/mcp/playground); attached to the token_limit_hit event.
+  source: TokenSource
+): Promise<TokenLimitResult> {
   const userPlan = await getUserPlan(userId);
   const limit = userPlan.effectiveLimit.tokens;
   const estimate = Math.max(0, Math.round(estimatedTokens));
 
   const supabase = await getSupabaseAdmin();
-  const { data, error } = (await supabase.rpc('increment_token_usage', {
+  const { data, error } = (await supabase.rpc('consume_tokens', {
     user_id: userId,
-    tokens_to_add: estimate,
+    tokens_to_consume: estimate,
     monthly_limit: limit,
   })) as unknown as {
-    data: { allowed: boolean } | null;
+    data: {
+      allowed: boolean;
+      from_monthly?: number;
+      from_packs?: number;
+      monthly_remaining?: number;
+      pack_remaining?: number;
+    } | null;
     error: { message: string } | null;
   };
 
@@ -206,13 +219,31 @@ export async function checkTokenLimit(
   }
 
   if (!data?.allowed) {
+    // Fire-and-forget (hot path): never awaited, never blocks the gate.
+    void captureServerEvent({
+      distinctId: userId,
+      event: 'token_limit_hit',
+      properties: {
+        source,
+        plan: userPlan.effectivePlan,
+        // "monthly vs credits exhausted": had_credits true means the user also
+        // had a credit balance that was drained, not just the monthly budget.
+        had_credits: (data?.pack_remaining ?? 0) > 0,
+        monthly_remaining: data?.monthly_remaining,
+        pack_remaining: data?.pack_remaining,
+      },
+    });
     return {
       allowed: false,
-      reason: `Monthly token budget reached for the ${userPlan.effectiveLimit.label} plan.`,
+      reason: `Monthly token budget and credit balance exhausted for the ${userPlan.effectiveLimit.label} plan.`,
     };
   }
 
-  return { allowed: true };
+  return {
+    allowed: true,
+    fromMonthly: data.from_monthly ?? estimate,
+    fromPacks: data.from_packs ?? 0,
+  };
 }
 
 /**
@@ -222,6 +253,17 @@ export async function checkTokenLimit(
  * adjust_token_usage RPC — no read-modify-write, no retry loop, no lost
  * increments. The adjustment is never blocked by the budget (the spend
  * already happened) and the counter floors at zero when actual < reserved.
+ *
+ * The true-up touches the MONTHLY counter only; credit packs are never
+ * clawed back or topped up here. Tradeoff, accepted deliberately: when the
+ * gate's reserve was partly funded by packs (checkTokenLimit's fromPacks),
+ * an overage charges the monthly counter and an underage refunds the
+ * monthly counter, in both cases leaving the pack debit exactly as
+ * reserved. The total charged still equals the actual count; only the
+ * split between the two pools can drift by up to (estimate - actual) per
+ * review. That is the price of keeping the true-up a single unconditional
+ * atomic UPDATE with no pack-row locking. Same spirit as the boundary-race
+ * note on {@link checkTokenLimit}: documented, not fixed.
  */
 export async function recordTokenUsage(
   userId: string,

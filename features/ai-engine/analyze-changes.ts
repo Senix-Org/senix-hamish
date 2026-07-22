@@ -6,8 +6,8 @@ import type { AnalysisResult } from '@features/ai-engine/llm/types';
  * Shared change-analysis pipeline.
  *
  * Both the MCP `review_changes` tool and the public playground feed file
- * changes through the exact same path: tree-sitter structural diff, then
- * the shared LLM provider and analysis prompt. Keeping that path here (one
+ * changes through the exact same path: regex structural diff, then the
+ * shared LLM provider and analysis prompt. Keeping that path here (one
  * place, not duplicated per route) means the two surfaces cannot drift,
  * and the playground never has to call the MCP endpoint over HTTP.
  */

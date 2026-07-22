@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
  * Proves the token-budget rate limiting: the gate atomically checks AND
- * reserves the estimate via the increment_token_usage RPC (so concurrent
- * reviews cannot all pass and collectively exceed the budget), the post-LLM
- * true-up adjusts usage by (actual - reserved) in a single atomic RPC (no
- * lost increments), the monthly counter auto-resets before the gate, and
- * the repo limit is enforced.
+ * reserves the estimate via the consume_tokens RPC (monthly budget first,
+ * then credit packs, so concurrent reviews cannot all pass and collectively
+ * exceed the budget), the post-LLM true-up adjusts usage by (actual -
+ * reserved) in a single atomic RPC (no lost increments), the monthly counter
+ * auto-resets before the gate, and the repo limit is enforced.
  * Failure means: users could consume unlimited paid LLM capacity, or usage
  * accounting would drift from reality.
  */
@@ -66,31 +66,57 @@ beforeEach(() => {
 describe('checkTokenLimit (atomic reserve via RPC)', () => {
   it('allows and reserves the estimate when the RPC accepts it', async () => {
     maybeSingle.mockResolvedValueOnce({ data: freeUser({ tokens_used_this_month: 1000 }), error: null });
-    rpc.mockResolvedValueOnce({ data: { allowed: true, new_usage: 3000 }, error: null });
+    rpc.mockResolvedValueOnce({
+      data: { allowed: true, from_monthly: 2000, from_packs: 0 },
+      error: null,
+    });
 
     const res = await checkTokenLimit('user-1', 2000, 'pr');
 
     expect(res.allowed).toBe(true);
-    expect(rpc).toHaveBeenCalledWith('increment_token_usage', {
+    if (res.allowed) {
+      expect(res.fromMonthly).toBe(2000);
+      expect(res.fromPacks).toBe(0);
+    }
+    expect(rpc).toHaveBeenCalledWith('consume_tokens', {
       user_id: 'user-1',
-      tokens_to_add: 2000,
+      tokens_to_consume: 2000,
       monthly_limit: PLAN_LIMITS.free.tokens,
     });
   });
 
-  it('blocks when the RPC reports the estimate would exceed the budget', async () => {
+  it('threads the monthly/pack split back out when packs fund the overflow', async () => {
     maybeSingle.mockResolvedValueOnce({
       data: freeUser({ tokens_used_this_month: PLAN_LIMITS.free.tokens - 500 }),
       error: null,
     });
     rpc.mockResolvedValueOnce({
-      data: { allowed: false, current_usage: PLAN_LIMITS.free.tokens - 500, limit: PLAN_LIMITS.free.tokens },
+      data: { allowed: true, from_monthly: 500, from_packs: 1500 },
+      error: null,
+    });
+
+    const res = await checkTokenLimit('user-1', 2000, 'pr');
+
+    expect(res.allowed).toBe(true);
+    if (res.allowed) {
+      expect(res.fromMonthly).toBe(500);
+      expect(res.fromPacks).toBe(1500);
+    }
+  });
+
+  it('blocks when monthly budget and credit packs together cannot cover it', async () => {
+    maybeSingle.mockResolvedValueOnce({
+      data: freeUser({ tokens_used_this_month: PLAN_LIMITS.free.tokens - 500 }),
+      error: null,
+    });
+    rpc.mockResolvedValueOnce({
+      data: { allowed: false, reason: 'insufficient_tokens', monthly_remaining: 500, pack_remaining: 0 },
       error: null,
     });
 
     const res = await checkTokenLimit('user-1', 2000, 'pr');
     expect(res.allowed).toBe(false);
-    if (!res.allowed) expect(res.reason).toMatch(/token budget reached/i);
+    if (!res.allowed) expect(res.reason).toMatch(/token budget and credit balance exhausted/i);
   });
 
   it('throws on an RPC error so the gate never silently passes', async () => {
@@ -148,7 +174,10 @@ describe('monthly reset', () => {
       data: freeUser({ tokens_used_this_month: 9999, tokens_reset_at: lastMonth }),
       error: null,
     });
-    rpc.mockResolvedValueOnce({ data: { allowed: true, new_usage: 2000 }, error: null });
+    rpc.mockResolvedValueOnce({
+      data: { allowed: true, from_monthly: 2000, from_packs: 0 },
+      error: null,
+    });
 
     const res = await checkTokenLimit('user-1', 2000, 'pr');
 
@@ -172,7 +201,7 @@ describe('getUserPlan (token usage the dashboard/billing render)', () => {
     expect(plan.tokenLimit).toBe(PLAN_LIMITS.free.tokens);
     // The dashboard renders "X / Y tokens used" + a percent of the budget.
     const percent = Math.min(100, Math.round((plan.tokensUsed / plan.tokenLimit) * 100));
-    expect(percent).toBe(25);
+    expect(percent).toBe(Math.round((12_451 / PLAN_LIMITS.free.tokens) * 100));
   });
 });
 
