@@ -41,7 +41,13 @@ export const rootMetadata: Metadata = {
   },
   description: siteConfig.description,
   applicationName: siteConfig.name,
-  icons: { icon: '/favicon.ico' },
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon.png', type: 'image/png', sizes: '512x512' },
+    ],
+    apple: [{ url: '/apple-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
   alternates: { canonical: canonicalUrl('/') },
   openGraph: {
     type: 'website',
